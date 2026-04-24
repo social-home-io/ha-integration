@@ -1,30 +1,9 @@
-# Dev-tooling config for the ha-integration repo. The custom component
-# itself is not a PyPI package — it ships inside HACS as the
-# `custom_components/social_home/` tree. This `pyproject.toml` only
-# drives ruff / mypy / pytest for the test suite.
-
-[project]
-name = "ha-integration-dev"
-version = "0.0.0"
-description = "Dev tooling scaffolding for the Social Home Home Assistant integration."
-requires-python = ">=3.13"
-license = {text = "Mozilla Public License 2.0"}
-
-[project.optional-dependencies]
-dev = [
-    "pytest>=8",
-    "pytest-asyncio>=0.23",
-    "pytest-cov>=4",
-    "mypy>=1.10",
-    "ruff>=0.8",
-    "pre-commit>=3.8",
-    # socialhome-client is intentionally unpinned here. The HACS
-    # install pulls ``>=1.0.0`` via ``manifest.json``; local dev
-    # installs the sibling checkout in editable mode.
-    "socialhome-client",
-    "voluptuous>=0.14",
-    "pytest-homeassistant-custom-component>=0.13",
-]
+# Tool-only ``pyproject.toml``. This repo ships a HACS custom
+# component — it is *not* a pip-installable package. ``[project]``
+# is deliberately absent: editable installs add a ``__path_hook__``
+# entry to ``sys.path`` that Home Assistant's custom-component
+# loader tries to ``iterdir()`` and crashes on. Dev / CI
+# dependencies live in ``requirements_test.txt`` instead.
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
@@ -68,11 +47,14 @@ python_version = "3.14"
 strict = true
 warn_unused_ignores = true
 warn_redundant_casts = true
-# Home Assistant's stub coverage is partial; the integration-side
-# type-checks stay strict on our own code, and HA imports are
-# marked as ``Any`` via ``ignore_missing_imports``.
 files = ["custom_components/social_home"]
 
 [[tool.mypy.overrides]]
 module = ["homeassistant.*", "voluptuous.*", "socialhome_client.*"]
 ignore_missing_imports = true
+# Strict mode's ``no_implicit_reexport`` rule is too aggressive for
+# third-party code we don't own — e.g. ``homeassistant.components
+# .hassio.get_supervisor_client`` is re-exported from the package
+# ``__init__`` but not listed in ``__all__``. Let mypy trust the
+# import path HA itself documents.
+implicit_reexport = true

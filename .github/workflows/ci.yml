@@ -20,7 +20,7 @@ jobs:
         with:
           python-version: "3.13"
           cache: pip
-      - run: pip install -e .[dev]
+      - run: pip install -r requirements_test.txt
       - run: ruff check custom_components tests
       - run: ruff format --check custom_components tests
 
@@ -33,7 +33,7 @@ jobs:
         with:
           python-version: "3.13"
           cache: pip
-      - run: pip install -e .[dev]
+      - run: pip install -r requirements_test.txt
       - run: mypy custom_components/social_home
 
   test:
@@ -48,7 +48,7 @@ jobs:
           # with HA's supported-version floor.
           python-version: "3.13"
           cache: pip
-      - run: pip install -e .[dev]
+      - run: pip install -r requirements_test.txt
       - run: pytest --cov --cov-report=xml
 
   hassfest:
@@ -68,6 +68,12 @@ jobs:
       # Validates ``hacs.json``, folder layout
       # (``custom_components/<domain>/``), README presence, and the
       # HACS-specific manifest fields.
+      #
+      # ``brands`` is skipped until the integration is registered
+      # against the shared https://github.com/home-assistant/brands
+      # repo (or we drop an icon into custom_components/social_home/
+      # brand/). Revisit once the logo asset is ready.
       - uses: hacs/action@main
         with:
           category: integration
+          ignore: brands

@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancel superseded runs on PR updates.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: ruff (lint + format)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -e .[dev]
+      - run: ruff check custom_components tests
+      - run: ruff format --check custom_components tests
+
+  typecheck:
+    name: mypy (strict)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -e .[dev]
+      - run: mypy custom_components/social_home
+
+  test:
+    name: pytest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          # pytest-homeassistant-custom-component pins HA Core, which
+          # runs on Python 3.13 only at the moment. Bump in lock-step
+          # with HA's supported-version floor.
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -e .[dev]
+      - run: pytest --cov --cov-report=xml
+
+  hassfest:
+    name: Home Assistant hassfest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Validates ``manifest.json`` shape, required keys, strings
+      # pass-through, and per-platform config schemas.
+      - uses: home-assistant/actions/hassfest@master
+
+  hacs:
+    name: HACS validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Validates ``hacs.json``, folder layout
+      # (``custom_components/<domain>/``), README presence, and the
+      # HACS-specific manifest fields.
+      - uses: hacs/action@main
+        with:
+          category: integration

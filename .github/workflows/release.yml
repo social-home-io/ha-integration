@@ -1,0 +1,45 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+# HACS installs the integration by cloning / downloading the release
+# tag — there is no PyPI artifact. This workflow exists to:
+#
+# 1. Enforce that ``manifest.json``'s ``version`` matches the
+#    release tag before the release goes live.
+# 2. Upload a zipped copy of ``custom_components/social_home/`` so
+#    HACS shows the correct download size and users running fresh
+#    installs get a deterministic artifact.
+#
+# Runs only when the release is actually published (not on
+# ``created``), so drafts don't trip the asset upload.
+
+jobs:
+  verify-and-upload:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify manifest.json version matches the tag
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          manifest_version=$(python -c "import json; print(json.load(open('custom_components/social_home/manifest.json'))['version'])")
+          if [[ "$tag" != "$manifest_version" ]]; then
+            echo "::error ::manifest.json version ($manifest_version) does not match release tag ($tag)"
+            exit 1
+          fi
+
+      - name: Zip the integration folder
+        run: |
+          cd custom_components/social_home
+          zip -r "$GITHUB_WORKSPACE/social_home.zip" .
+
+      - name: Attach the zip to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "$GITHUB_REF_NAME" social_home.zip --clobber

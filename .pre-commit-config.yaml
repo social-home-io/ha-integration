@@ -1,0 +1,59 @@
+# Pre-commit hooks for ha-integration.
+#
+# Install:   pip install pre-commit && pre-commit install
+# Run once:  pre-commit run --all-files
+#
+# ruff + mypy run over the paths CI enforces, so the local gate
+# matches what the workflow enforces on every push.
+
+# No ``default_language_version`` — pre-commit picks whichever
+# Python 3.13+ interpreter is on PATH. CI pins 3.13 explicitly via
+# actions/setup-python; local developers can run on 3.13 or 3.14.
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-yaml
+      - id: check-json
+      - id: check-toml
+      - id: check-added-large-files
+        args: ["--maxkb=512"]
+      - id: check-merge-conflict
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: mixed-line-ending
+        args: ["--fix=lf"]
+      - id: detect-private-key
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.0
+    hooks:
+      - id: ruff
+        name: ruff (lint, custom_components + tests)
+        args: ["--fix", "custom_components", "tests"]
+        always_run: true
+        pass_filenames: false
+      - id: ruff-format
+        name: ruff (format, custom_components + tests)
+        args: ["custom_components", "tests"]
+        always_run: true
+        pass_filenames: false
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.13.0
+    hooks:
+      - id: mypy
+        name: mypy (custom_components/social_home, strict)
+        # mypy needs the HA + socialhome-client type info to resolve
+        # the integration's imports. We install the same dev extras
+        # CI installs so the hook fails locally the same way it
+        # would on GitHub.
+        additional_dependencies:
+          - "homeassistant>=2026.4"
+          - "socialhome-client>=2026.4.24"
+          - "voluptuous>=0.14"
+        args:
+          ["--config-file=pyproject.toml", "custom_components/social_home"]
+        always_run: true
+        pass_filenames: false

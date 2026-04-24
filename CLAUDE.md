@@ -14,8 +14,11 @@ config flow, coordinator, entity platforms.
 
 ## Hard rules
 
-- **Python 3.13 floor.** HA Core runs on 3.13 — do not require 3.14
-  grammar. `from __future__ import annotations` in every module.
+- **Python 3.14 floor.** HA Core raised its floor to 3.14.2 in
+  2026.3; ``homeassistant`` and
+  ``pytest-homeassistant-custom-component`` no longer resolve on
+  3.13. ``from __future__ import annotations`` still goes in every
+  module.
 - **Never import from `social_home` (core).** The only runtime
   dependency beyond Home Assistant is `socialhome-client>=1.0.0`
   (declared in `manifest.json`).

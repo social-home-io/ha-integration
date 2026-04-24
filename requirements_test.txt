@@ -1,0 +1,20 @@
+# Dev / CI dependencies for the ha-integration test suite.
+#
+# This repo ships a custom component through HACS (no pip install);
+# the test suite still needs ruff, mypy, pytest, and the
+# ``pytest-homeassistant-custom-component`` plugin to drive the real
+# Home Assistant Core test harness. ``pyproject.toml`` intentionally
+# has no ``[project]`` table — installing the repo as a package
+# leaves a pip-editable finder on ``sys.path`` that HA's custom-
+# component loader trips over at iterdir-time.
+
+pytest>=8
+pytest-asyncio>=0.23
+pytest-cov>=4
+mypy>=1.10
+ruff>=0.8
+pre-commit>=3.8
+voluptuous>=0.14
+pytest-homeassistant-custom-component>=0.13
+homeassistant>=2026.4
+socialhome-client>=2026.4.24

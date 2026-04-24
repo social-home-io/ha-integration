@@ -1,16 +1,16 @@
 {
   "domain": "social_home",
   "name": "Social Home",
-  "version": "1.0.0",
-  "documentation": "https://social-home.io/docs/getting-started/",
-  "issue_tracker": "https://github.com/social-home-io/ha-integration/issues",
-  "codeowners": ["@social-home-io"],
-  "requirements": ["socialhome-client>=2026.4.24"],
-  "dependencies": [],
   "after_dependencies": ["hassio"],
+  "codeowners": ["@social-home-io"],
   "config_flow": true,
-  "iot_class": "local_push",
+  "dependencies": [],
+  "documentation": "https://social-home.io/docs/getting-started/",
   "integration_type": "service",
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/social-home-io/ha-integration/issues",
   "quality_scale": "silver",
+  "requirements": ["socialhome-client>=2026.4.24"],
+  "version": "1.0.0",
   "zeroconf": []
 }

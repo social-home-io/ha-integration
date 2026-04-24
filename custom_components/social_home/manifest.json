@@ -1,7 +1,6 @@
 {
   "domain": "social_home",
   "name": "Social Home",
-  "after_dependencies": ["hassio"],
   "codeowners": ["@social-home-io"],
   "config_flow": true,
   "dependencies": [],

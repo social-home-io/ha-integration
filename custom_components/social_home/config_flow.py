@@ -15,12 +15,9 @@ re-designing the surface.
 
 from __future__ import annotations
 
-import logging
 from typing import Any
 
 import voluptuous as vol
-from aiohasupervisor.exceptions import SupervisorError
-from homeassistant.components.hassio import get_supervisor_client
 from homeassistant.config_entries import (
     SOURCE_REAUTH,
     ConfigEntry,
@@ -28,12 +25,10 @@ from homeassistant.config_entries import (
     ConfigFlowResult,
     OptionsFlow,
 )
-from homeassistant.core import HomeAssistant
 from homeassistant.helpers.service_info.hassio import HassioServiceInfo
 from socialhome_client import SHAuthError, SHClientError, SocialHomeClient
 
 from .const import (
-    ADDON_HTTP_PORT,
     CONF_TOKEN,
     CONF_URL,
     CONF_USER_ID,
@@ -48,8 +43,6 @@ from .const import (
     OPT_SYNC_SHOPPING,
     OPT_SYNC_SPACE_CALENDARS,
 )
-
-_LOGGER = logging.getLogger(__name__)
 
 #: User flow schema — URL + token, both required. ``vol.Url`` only
 #: validates shape (scheme + host); the real validation is the
@@ -76,32 +69,6 @@ async def _validate(url: str, token: str) -> dict[str, str]:
     async with SocialHomeClient(url, token) as client:
         me = await client.me.get()
     return {CONF_USER_ID: me.user_id, CONF_USERNAME: me.username}
-
-
-async def _resolve_addon_url(hass: HomeAssistant, slug: str) -> str:
-    """Resolve the internal HA App URL from its add-on slug.
-
-    The Social Home add-on runs inside the Supervisor's private
-    network; its container is reachable at the hostname reported
-    by the Supervisor (usually ``core-<slug>`` or the slug
-    verbatim) on :data:`ADDON_HTTP_PORT`. We fetch that hostname
-    via the Supervisor client instead of hard-coding a pattern, so
-    an add-on rename never breaks the integration.
-
-    Raises :class:`SHClientError` so :meth:`async_step_hassio` can
-    map any failure back to ``cannot_connect``.
-    """
-    supervisor = get_supervisor_client(hass)
-    try:
-        info = await supervisor.addons.addon_info(slug)
-    except SupervisorError as err:
-        _LOGGER.debug("Social Home: Supervisor lookup for %s failed: %s", slug, err)
-        raise SHClientError(f"could not resolve Social Home add-on {slug}: {err}") from err
-
-    hostname = getattr(info, "hostname", None)
-    if not hostname:
-        raise SHClientError(f"Social Home add-on {slug} has no resolvable hostname")
-    return f"http://{hostname}:{ADDON_HTTP_PORT}"
 
 
 class SocialHomeConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -140,24 +107,16 @@ class SocialHomeConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_hassio(self, discovery_info: HassioServiceInfo) -> ConfigFlowResult:
         """Supervisor pushed a discovery record for the HA App container.
 
-        The core server publishes a minimal payload
-        (``{"service": "socialhome", "config": {"token": …}}``) and
-        relies on HA to resolve the add-on's internal hostname from
-        the slug — the URL is never wire-visible for a local install.
-        We also accept a pre-resolved ``url`` in the payload so the
-        flow stays compatible with any future change that has core
-        publish the full URL itself.
+        Core publishes the full payload the integration needs:
+        ``{"service": "socialhome", "config": {"url": …, "token": …}}``.
+        Both fields are required — we abort with ``cannot_connect``
+        if either is missing, since the integration cannot reach
+        the server without them.
         """
+        url = str(discovery_info.config.get("url") or "")
         token = str(discovery_info.config.get("token") or "")
-        if not token:
+        if not url or not token:
             return self.async_abort(reason="cannot_connect")
-
-        url = discovery_info.config.get("url")
-        if not url:
-            try:
-                url = await _resolve_addon_url(self.hass, discovery_info.slug)
-            except SHClientError:
-                return self.async_abort(reason="cannot_connect")
 
         try:
             identity = await _validate(url, token)

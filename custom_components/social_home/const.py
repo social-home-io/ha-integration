@@ -55,12 +55,3 @@ DEFAULT_SYNC_SHOPPING: Final = True
 #: ``GET /api/me/unread-summary``. Spec §6.2a. WS events can trigger
 #: an immediate refresh between polls.
 UPDATE_INTERVAL_SECONDS: Final = 60
-
-# ── Supervisor / HA App discovery ───────────────────────────────────────
-
-#: Default HTTP port of the Social Home server as shipped inside the
-#: HA App — the spec §5 docker-compose and
-#: ``core/socialhome/config.py`` both pin this to 8099. Lifted here
-#: as a constant so the hassio config-flow step can construct a
-#: reachable URL from just the add-on hostname.
-ADDON_HTTP_PORT: Final = 8099

@@ -7,9 +7,8 @@ is exercised at least once.
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
-from aiohasupervisor.exceptions import SupervisorError
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
@@ -31,47 +30,21 @@ from custom_components.social_home.const import (
 
 def _hassio_info(
     *,
+    url: str = "http://sh.test",
     token: str = "tok",
-    url: str | None = None,
     slug: str = "social_home",
 ) -> HassioServiceInfo:
     """Build a hassio discovery payload.
 
-    Matches what the core server actually posts to the Supervisor
-    (``{"token": …}`` only) — pass ``url`` to exercise the future
-    spec-aligned shape that also includes a pre-resolved URL.
+    Matches the payload core publishes: both ``url`` and ``token``
+    are required fields. Tests that want to simulate a bad payload
+    override either one explicitly.
     """
-    config: dict[str, str] = {"token": token}
-    if url is not None:
-        config["url"] = url
     return HassioServiceInfo(
-        config=config,
+        config={"url": url, "token": token},
         name="Social Home",
         slug=slug,
         uuid="00000000-0000-0000-0000-000000000001",
-    )
-
-
-def _patch_supervisor_resolver(hostname: str | SupervisorError):
-    """Patch the Supervisor client so ``addon_info`` returns ``hostname``.
-
-    Pass a :class:`SupervisorError` to simulate a Supervisor-side
-    failure; anything else is used as the resolved internal
-    hostname string.
-    """
-    if isinstance(hostname, SupervisorError):
-        addon_info = AsyncMock(side_effect=hostname)
-    else:
-        info = MagicMock()
-        info.hostname = hostname
-        addon_info = AsyncMock(return_value=info)
-
-    supervisor = MagicMock()
-    supervisor.addons = MagicMock()
-    supervisor.addons.addon_info = addon_info
-    return patch(
-        "custom_components.social_home.config_flow.get_supervisor_client",
-        return_value=supervisor,
     )
 
 
@@ -153,52 +126,34 @@ async def test_user_flow_duplicate_is_aborted(
 # ── Hassio discovery ──────────────────────────────────────────────────────
 
 
-async def test_hassio_flow_resolves_url_from_slug(
+async def test_hassio_flow_creates_entry_from_payload(
     hass: HomeAssistant, mock_client: MagicMock
 ) -> None:
-    """Core-shape payload (token only): resolve URL via Supervisor."""
-    with _patch_supervisor_resolver("core-socialhome"):
-        result = await hass.config_entries.flow.async_init(
-            DOMAIN,
-            context={"source": config_entries.SOURCE_HASSIO},
-            data=_hassio_info(token="tok"),
-        )
-        assert result["type"] is FlowResultType.FORM
-        assert result["step_id"] == "hassio_confirm"
+    """Core publishes ``{url, token}``; both flow through untouched."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": config_entries.SOURCE_HASSIO},
+        data=_hassio_info(url="http://sh.test", token="tok"),
+    )
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "hassio_confirm"
 
-        result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
-
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["data"] == {
-        CONF_URL: "http://core-socialhome:8099",
+        CONF_URL: "http://sh.test",
         CONF_TOKEN: "tok",
         CONF_USER_ID: "user-1",
         CONF_USERNAME: "pascal",
     }
 
 
-async def test_hassio_flow_accepts_prerolled_url(
-    hass: HomeAssistant, mock_client: MagicMock
-) -> None:
-    """Spec-form payload with a pre-resolved URL skips the Supervisor lookup."""
-    with _patch_supervisor_resolver(SupervisorError("would fail if called")):
-        result = await hass.config_entries.flow.async_init(
-            DOMAIN,
-            context={"source": config_entries.SOURCE_HASSIO},
-            data=_hassio_info(token="tok", url="http://sh.test"),
-        )
-        result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
-
-    assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert result["data"][CONF_URL] == "http://sh.test"
-
-
-async def test_hassio_flow_aborts_when_token_missing(hass: HomeAssistant) -> None:
+async def test_hassio_flow_aborts_when_url_missing(hass: HomeAssistant) -> None:
     result = await hass.config_entries.flow.async_init(
         DOMAIN,
         context={"source": config_entries.SOURCE_HASSIO},
         data=HassioServiceInfo(
-            config={},
+            config={"token": "tok"},
             name="Social Home",
             slug="social_home",
             uuid="00000000-0000-0000-0000-000000000002",
@@ -208,15 +163,17 @@ async def test_hassio_flow_aborts_when_token_missing(hass: HomeAssistant) -> Non
     assert result["reason"] == "cannot_connect"
 
 
-async def test_hassio_flow_aborts_when_supervisor_lookup_fails(
-    hass: HomeAssistant, mock_client: MagicMock
-) -> None:
-    with _patch_supervisor_resolver(SupervisorError("no such addon")):
-        result = await hass.config_entries.flow.async_init(
-            DOMAIN,
-            context={"source": config_entries.SOURCE_HASSIO},
-            data=_hassio_info(token="tok"),
-        )
+async def test_hassio_flow_aborts_when_token_missing(hass: HomeAssistant) -> None:
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": config_entries.SOURCE_HASSIO},
+        data=HassioServiceInfo(
+            config={"url": "http://sh.test"},
+            name="Social Home",
+            slug="social_home",
+            uuid="00000000-0000-0000-0000-000000000003",
+        ),
+    )
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "cannot_connect"
 
@@ -226,12 +183,11 @@ async def test_hassio_flow_aborts_on_connect_error(
 ) -> None:
     mock_client.return_value.me.get = AsyncMock(side_effect=SHClientError("boom"))
 
-    with _patch_supervisor_resolver("core-socialhome"):
-        result = await hass.config_entries.flow.async_init(
-            DOMAIN,
-            context={"source": config_entries.SOURCE_HASSIO},
-            data=_hassio_info(token="tok"),
-        )
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": config_entries.SOURCE_HASSIO},
+        data=_hassio_info(url="http://sh.test", token="tok"),
+    )
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "cannot_connect"
 
@@ -244,15 +200,14 @@ async def test_hassio_flow_updates_existing_entry(
     """Re-discovery swaps URL + token on the already-configured entry."""
     config_entry.add_to_hass(hass)
 
-    with _patch_supervisor_resolver("core-socialhome-new"):
-        result = await hass.config_entries.flow.async_init(
-            DOMAIN,
-            context={"source": config_entries.SOURCE_HASSIO},
-            data=_hassio_info(token="rotated"),
-        )
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": config_entries.SOURCE_HASSIO},
+        data=_hassio_info(url="http://sh-new.test", token="rotated"),
+    )
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "already_configured"
-    assert config_entry.data[CONF_URL] == "http://core-socialhome-new:8099"
+    assert config_entry.data[CONF_URL] == "http://sh-new.test"
     assert config_entry.data[CONF_TOKEN] == "rotated"
 
 

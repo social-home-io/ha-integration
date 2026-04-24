@@ -1,0 +1,78 @@
+# Dev-tooling config for the ha-integration repo. The custom component
+# itself is not a PyPI package — it ships inside HACS as the
+# `custom_components/social_home/` tree. This `pyproject.toml` only
+# drives ruff / mypy / pytest for the test suite.
+
+[project]
+name = "ha-integration-dev"
+version = "0.0.0"
+description = "Dev tooling scaffolding for the Social Home Home Assistant integration."
+requires-python = ">=3.13"
+license = {text = "Mozilla Public License 2.0"}
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=4",
+    "mypy>=1.10",
+    "ruff>=0.8",
+    "pre-commit>=3.8",
+    # socialhome-client is intentionally unpinned here. The HACS
+    # install pulls ``>=1.0.0`` via ``manifest.json``; local dev
+    # installs the sibling checkout in editable mode.
+    "socialhome-client",
+    "voluptuous>=0.14",
+    "pytest-homeassistant-custom-component>=0.13",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["custom_components/social_home"]
+
+[tool.coverage.report]
+# Coverage for config-flow branches and the coordinator error paths
+# is exercised by behavioural tests; raise this floor as the
+# integration grows.
+fail_under = 85
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "E", "F", "W",   # pyflakes + pycodestyle
+    "I",             # import sorting
+    "B",             # bugbear
+    "UP",            # pyupgrade
+    "SIM",           # simplify
+    "RUF",
+]
+
+[tool.mypy]
+# Runtime floor is 3.13 (HA Core's minimum) but HA's own source uses
+# 3.14-only grammar in a handful of files, which mypy refuses to
+# parse under ``python_version = "3.13"``. Check against 3.14 so the
+# HA imports parse; the code we write here keeps 3.13 grammar and
+# CI runs the test suite on 3.13 to confirm.
+python_version = "3.14"
+strict = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+# Home Assistant's stub coverage is partial; the integration-side
+# type-checks stay strict on our own code, and HA imports are
+# marked as ``Any`` via ``ignore_missing_imports``.
+files = ["custom_components/social_home"]
+
+[[tool.mypy.overrides]]
+module = ["homeassistant.*", "voluptuous.*", "socialhome_client.*"]
+ignore_missing_imports = true

@@ -1,0 +1,48 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up Social Home",
+        "description": "Enter the URL of your Social Home instance and an API token generated in Settings → Security.",
+        "data": {
+          "url": "Instance URL",
+          "token": "API Token"
+        }
+      },
+      "hassio_confirm": {
+        "title": "Social Home is ready",
+        "description": "Social Home was detected as a Home Assistant App for {username}. Confirm to finish setup."
+      },
+      "reauth_confirm": {
+        "title": "Re-authenticate Social Home",
+        "description": "Your Social Home token has expired or been revoked. Paste a fresh token generated in Settings → Security.",
+        "data": {
+          "token": "API Token"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not reach the Social Home instance — check the URL.",
+      "invalid_auth": "Authentication failed — check the API token."
+    },
+    "abort": {
+      "already_configured": "This Social Home account is already configured.",
+      "cannot_connect": "Could not reach the Social Home instance.",
+      "reauth_successful": "Re-authentication was successful."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Social Home options",
+        "description": "Choose what the integration syncs between Home Assistant and Social Home.",
+        "data": {
+          "sync_location": "Sync person location to Social Home",
+          "sync_calendar": "Sync personal calendars",
+          "sync_space_calendars": "Also sync space calendars",
+          "sync_shopping": "Sync shopping list"
+        }
+      }
+    }
+  }
+}

@@ -4,7 +4,7 @@ AI agent instruction file. Read before editing. Canonical spec:
 `spec_work.md` §7 in the Social Home meta-repo.
 
 ### Architecture rules
-- Python 3.13 floor (HA Core runs on 3.13 — do not raise it).
+- Python 3.14 floor — HA Core's own floor is 3.14.2 (2026.3+).
 - Never import from `social_home` (core). Runtime deps: `homeassistant`
   and `socialhome-client>=1.0.0`.
 - All I/O is async; no `time.sleep`, no blocking calls.

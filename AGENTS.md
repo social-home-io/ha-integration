@@ -5,6 +5,8 @@ AI agent instruction file. Read before editing. Canonical spec:
 
 ### Architecture rules
 - Python 3.14 floor — HA Core's own floor is 3.14.2 (2026.3+).
+- CalVer release tags (e.g. ``2026.4.25``); ``manifest.json``'s
+  ``version`` must match the release tag.
 - Never import from `social_home` (core). Runtime deps: `homeassistant`
   and `socialhome-client>=1.0.0`.
 - All I/O is async; no `time.sleep`, no blocking calls.

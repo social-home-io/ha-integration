@@ -10,6 +10,6 @@
   "issue_tracker": "https://github.com/social-home-io/ha-integration/issues",
   "quality_scale": "silver",
   "requirements": ["socialhome-client>=2026.4.25"],
-  "version": "1.1.0",
+  "version": "2026.4.25",
   "zeroconf": []
 }

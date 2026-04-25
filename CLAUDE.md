@@ -19,6 +19,12 @@ config flow, coordinator, entity platforms.
   ``pytest-homeassistant-custom-component`` no longer resolve on
   3.13. ``from __future__ import annotations`` still goes in every
   module.
+- **CalVer releases (no ``v`` prefix).** Tags look like
+  ``2026.4.25``; ``manifest.json``'s ``version`` field must match
+  the release tag (``release.yml`` enforces this on every
+  publish). Match the convention the rest of the social-home
+  project uses (``socialhome``, ``socialhome-client``, ``ha-app``,
+  …) — semver tags will fail HACS + the release workflow.
 - **Never import from `social_home` (core).** The only runtime
   dependency beyond Home Assistant is `socialhome-client>=1.0.0`
   (declared in `manifest.json`).

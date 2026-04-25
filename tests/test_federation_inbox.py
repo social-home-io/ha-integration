@@ -108,24 +108,38 @@ async def test_inbox_post_non_2xx_is_passed_through(
     assert await resp.read() == b'{"error":"Replay detected"}'
 
 
-async def test_inbox_post_oversize_body_rejected_without_forward(
+async def test_inbox_post_forwards_large_body_to_addon(
     hass: HomeAssistant,
     config_entry: MockConfigEntry,
     mock_client: MagicMock,
     mock_ws_manager: MagicMock,
     hass_client_no_auth: ClientSessionGenerator,
 ) -> None:
-    """Spec §7.10 caps envelopes at 1 MiB; reject locally to save bandwidth."""
-    forwarder = AsyncMock()
-    mock_client.return_value.federation.forward_inbox_envelope = forwarder
+    """The inbox doubles as a WebRTC fallback for chunked media — no local cap.
+
+    The add-on is the policy point for envelope / chunk size; the
+    integration is a pure passthrough so a large body lands on the
+    relay verbatim.
+    """
+    captured: dict[str, bytes] = {}
+
+    async def _record(inbox_id: str, body: bytes, *, extra_headers=None) -> FederationRelayResult:
+        captured["inbox_id"] = inbox_id.encode()
+        captured["body"] = body
+        return FederationRelayResult(status=200, body=b"", content_type="")
+
+    mock_client.return_value.federation.forward_inbox_envelope = AsyncMock(side_effect=_record)
     await _setup(hass, config_entry, mock_client, mock_ws_manager)
     client = await hass_client_no_auth()
 
-    oversize = b"x" * (1 * 1024 * 1024 + 1)
-    resp = await client.post("/api/social_home/inbox/wh-peer", data=oversize)
+    # 2 MiB — comfortably above the spec's old envelope-only cap,
+    # well below HA's ``client_max_size`` (16 MiB default).
+    big = b"x" * (2 * 1024 * 1024)
+    resp = await client.post("/api/social_home/inbox/wh-peer", data=big)
 
-    assert resp.status == 413
-    forwarder.assert_not_awaited()
+    assert resp.status == 200
+    assert captured["inbox_id"] == b"wh-peer"
+    assert captured["body"] == big
 
 
 async def test_inbox_post_maps_client_error_to_bad_gateway(

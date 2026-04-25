@@ -7,6 +7,13 @@ Home Assistant HTTP server, and when a peer POSTs a federation
 envelope to it we proxy the raw bytes to the add-on's internal
 ``/federation/inbox/{inbox_id}`` and mirror the response back.
 
+The endpoint also doubles as the WebRTC fallback transport: when
+DataChannel pairing fails (strict NAT, missing TURN, etc.) bulk
+content — including chunked photos / files — flows through here
+instead. Size policy therefore lives in the add-on (which knows
+the per-event caps and chunking rules) — the integration is a
+pure passthrough.
+
 This module does not decrypt, validate, or even JSON-parse the
 envelope: the add-on runs the full §24.11 validation pipeline, so
 any crypto in the integration would only add latency + risk. The
@@ -30,11 +37,6 @@ if TYPE_CHECKING:
     from . import SocialHomeRuntimeData
 
 _LOGGER = logging.getLogger(__name__)
-
-#: Mirror the add-on's 1 MiB inbound-envelope cap. Oversize payloads
-#: are rejected here so we don't waste bandwidth on the internal
-#: hop + let the add-on's own limiter do the final check anyway.
-_MAX_ENVELOPE_BYTES: Final = 1 * 1024 * 1024
 
 #: HA keeps view registration idempotent via a flag in
 #: ``hass.data[DOMAIN]``. Reloading a single config entry must not
@@ -62,13 +64,11 @@ class SocialHomeFederationInboxView(HomeAssistantView):
         self._hass = hass
 
     async def post(self, request: web.Request, inbox_id: str) -> web.Response:
-        # Body size gate — matches spec §24.11 / core's 1 MiB cap.
-        # Check ``Content-Length`` first when the peer was polite
-        # enough to send one; otherwise fall back to the body after
-        # ``read()``.
-        content_length = request.content_length
-        if content_length is not None and content_length > _MAX_ENVELOPE_BYTES:
-            return web.json_response({"error": "envelope_too_large"}, status=413)
+        # No local size cap — the inbox is also the WebRTC fallback
+        # transport (chunked photos, files, etc.). Size policy lives
+        # in the add-on, which knows the per-event caps; HA's HTTP
+        # stack still enforces ``client_max_size`` (16 MiB by
+        # default) above us as a safety net.
         try:
             body = await request.read()
         except web.HTTPException:
@@ -76,8 +76,6 @@ class SocialHomeFederationInboxView(HomeAssistantView):
         except Exception as err:  # defensive — aiohttp should have typed this
             _LOGGER.debug("Social Home: inbox body read failed: %s", err)
             return web.json_response({"error": "bad_body"}, status=400)
-        if len(body) > _MAX_ENVELOPE_BYTES:
-            return web.json_response({"error": "envelope_too_large"}, status=413)
 
         runtime = _resolve_runtime(self._hass)
         if runtime is None:

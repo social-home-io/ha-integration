@@ -17,4 +17,4 @@ pre-commit>=3.8
 voluptuous>=0.14
 pytest-homeassistant-custom-component>=0.13
 homeassistant>=2026.4
-socialhome-client>=2026.4.24
+socialhome-client>=2026.4.25

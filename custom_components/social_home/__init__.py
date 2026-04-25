@@ -2,7 +2,7 @@
 
 Spec §7.10. No entity platforms yet (see :data:`PLATFORMS` —
 empty list); this module owns the per-entry shared objects plus
-two always-on bridges that don't surface as entities:
+three always-on bridges that don't surface as entities:
 
 * federation base URL push (spec §7.10) — the HA integration is
   the only party that knows the instance's externally-reachable
@@ -12,6 +12,10 @@ two always-on bridges that don't surface as entities:
   that forwards ``person.*`` updates to
   ``POST /api/presence/location``. Gated on the ``sync_location``
   option so users can opt out without removing the integration.
+* federation inbox relay (spec §7.10) — public HA HTTP view at
+  ``/api/social_home/inbox/{inbox_id}`` that proxies raw envelopes
+  from remote Social Home instances into the add-on's internal
+  ``/federation/inbox/{inbox_id}``.
 
 Entity platforms (sensor / calendar / notify / shopping / …) land
 one at a time in follow-up work.
@@ -32,6 +36,7 @@ from .federation import (
     async_push_federation_base,
     async_register_federation_listener,
 )
+from .federation_inbox import async_register_inbox_view
 from .presence import async_setup_presence
 
 
@@ -79,6 +84,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: SocialHomeConfigEntry) -
     # handles later HA config changes.
     await async_push_federation_base(hass, client)
     async_register_federation_listener(hass, entry, client)
+
+    # Public inbox URL for inbound federation envelopes. The view
+    # is stateless per request, looks up the live config entry on
+    # every call, and is idempotent across reloads — one
+    # registration per HA process.
+    async_register_inbox_view(hass)
 
     # Location forwarder — only attach when the user wants HA →
     # Social Home presence sync. Toggling the option triggers a

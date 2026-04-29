@@ -78,3 +78,38 @@ plumbing — we don't depend on `homeassistant` as a test-time
 import because its full dependency tree is large. When a real HA
 fixture is needed (e.g. full end-to-end config-flow run), use the
 `pytest-homeassistant-custom-component` plugin.
+
+## Keep docs in sync
+
+`docs/` is the public reference for the integration's design. Treat
+the matching doc file as part of the same change:
+
+- **Added a new entity platform** (`sensor.py`, `calendar.py`,
+  `notify.py`, `shopping_list.py`)? Add an entry to the lifecycle
+  diagram and the "Where things live" table in
+  `docs/architecture.md`. Drop the platform name into `PLATFORMS`
+  in `const.py` AND mention it in `docs/architecture.md`.
+- **Changed the coordinator** (different polled endpoint, new
+  interval, additional exception mapping)? Update the coordinator
+  section + exception-mapping table in `docs/architecture.md`.
+- **Changed the config flow or its options** (new flow, new option
+  toggle, validation tweak)? Update both the strings/translations
+  files AND the config-flow table in `docs/architecture.md`.
+- **Changed the presence bridge gates** (accuracy cap, distance
+  dedup threshold, GPS precision)? Update the four-gate list in
+  `docs/principles.md` AND the matching section in
+  `docs/architecture.md`.
+- **Changed the test strategy** (coverage gate, mock approach,
+  shared fixtures)? Update `docs/testing.md` so the fixtures table
+  + commands match `tests/conftest.py` and CI.
+- **Touched a §7 invariant** (raised the Python floor, added a
+  runtime dependency, started importing from core, exposed the
+  bearer token)? Update `docs/principles.md` AND flag the change
+  in the PR description for explicit reviewer sign-off.
+- **Added a new top-level doc file under `docs/`?** Link it from
+  `docs/README.md` and from the repo-root `README.md`.
+
+Reviewer checklist: if a PR adds a platform, changes the
+coordinator, changes the config flow, changes a presence gate, or
+shifts the test strategy and the docs aren't touched, push back.
+Incremental accuracy beats big-bang rewrites.

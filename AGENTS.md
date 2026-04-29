@@ -24,11 +24,30 @@ AI agent instruction file. Read before editing. Canonical spec:
 - Coverage gate: 85 % branch.
 
 ### Keep docs in sync
-- Changed the config-flow UI strings? Update both `strings.json` and
-  `translations/en.json` in the same commit.
-- Changed the coordinator's polled endpoint or interval? Update the
-  `SocialHomeCoordinator` docstring and the spec reference.
+Docs live in `docs/`. Ship the matching doc update in the same
+commit:
+- New entity platform (`sensor.py`, `calendar.py`, `notify.py`,
+  `shopping_list.py`) → update the lifecycle diagram + "Where
+  things live" table in `docs/architecture.md`.
+- Changed coordinator (different polled endpoint, new interval,
+  additional exception mapping) → coordinator section + exception
+  table in `docs/architecture.md`.
+- Changed the config flow or its options → update both the
+  strings/translations files AND the config-flow table in
+  `docs/architecture.md`.
+- Changed the presence bridge gates (accuracy cap, distance dedup,
+  GPS precision) → four-gate list in `docs/principles.md` AND the
+  matching section in `docs/architecture.md`.
+- Test-strategy change (coverage gate, mock approach, shared
+  fixtures) → `docs/testing.md`.
+- §7 invariant touched (raise the Python floor, add a runtime
+  dependency, import from core, expose the bearer token) →
+  `docs/principles.md`, **and** flag in the PR description for
+  explicit reviewer sign-off.
+- New top-level doc file under `docs/` → link from `docs/README.md`
+  and from the repo-root `README.md`.
 
 ### File locations
 - Integration code: `custom_components/social_home/`
 - Tests: `tests/` (mirrors the module tree)
+- Docs: `docs/` (principles, architecture, testing)

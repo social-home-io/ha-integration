@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import logging
 import math
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.const import EVENT_STATE_CHANGED
 from homeassistant.core import Event, EventStateChangedData, HomeAssistant
@@ -67,7 +67,9 @@ def _haversine_m(a: tuple[float, float], b: tuple[float, float]) -> float:
     return 2 * _EARTH_RADIUS_M * math.asin(math.sqrt(h))
 
 
-def async_setup_presence(hass: HomeAssistant, entry: ConfigEntry, client: SocialHomeClient) -> None:
+def async_setup_presence(
+    hass: HomeAssistant, entry: ConfigEntry[Any], client: SocialHomeClient
+) -> None:
     """Subscribe to ``state_changed`` and forward person updates.
 
     The unsubscribe hook is registered on ``entry`` so

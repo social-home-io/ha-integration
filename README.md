@@ -38,6 +38,19 @@ pytest
 Tests stub out the Home Assistant core plumbing; no live HA instance
 required.
 
+## Documentation
+
+- [`docs/principles.md`](docs/principles.md) — design principles
+  (thin bridge, Python 3.14 floor for HA Core, CalVer, async
+  everywhere, four GPS gates).
+- [`docs/architecture.md`](docs/architecture.md) — setup / unload
+  lifecycle, config flow, coordinator, federation base URL push,
+  federation inbox view, presence bridge.
+- [`docs/testing.md`](docs/testing.md) — test strategy, 85 %
+  coverage gate, shared fixtures, release flow.
+- [`CLAUDE.md`](CLAUDE.md), [`AGENTS.md`](AGENTS.md) — guidance for
+  AI assistants working in this repo.
+
 ## License
 
 [Mozilla Public License 2.0](LICENSE).

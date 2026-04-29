@@ -1,0 +1,189 @@
+# Architecture
+
+How the integration fits together. Distilled from §7 of `spec_work.md`
+plus the current code under `custom_components/social_home/`.
+
+The integration is a **skeleton with already-shipped bridges** — config
+flow, coordinator, federation base URL push, the federation inbox HTTP
+view, and the presence bridge are real implementations. Entity
+platforms (sensor, calendar, notify, shopping) land in follow-up PRs;
+the platforms list in `const.py` is intentionally empty for now.
+
+## Module layout
+
+```
+custom_components/social_home/
+├── __init__.py            async_setup_entry / async_unload_entry
+├── const.py               DOMAIN, platform list, option keys, defaults
+├── config_flow.py         user + Hassio + reauth + options flows
+├── coordinator.py         SocialHomeCoordinator (polls /api/me/unread-summary)
+├── federation.py          federation base URL push + listener
+├── federation_inbox.py    /api/social_home/inbox/{inbox_id} HTTP view
+├── presence.py            person.* state-change → /api/presence/location
+├── manifest.json          HACS manifest — domain, version, requirements
+├── strings.json           UI strings (source of truth)
+└── translations/en.json   en mirror of strings.json
+tests/                     pytest tree mirroring the module tree
+```
+
+## Lifecycle
+
+`async_setup_entry` builds the runtime objects in a fixed order:
+
+```mermaid
+sequenceDiagram
+    participant HA as Home Assistant
+    participant entry as ConfigEntry
+    participant init as async_setup_entry
+    participant client as SocialHomeClient
+    participant coord as SocialHomeCoordinator
+    participant pres as PresenceBridge
+    participant view as FederationInboxView
+
+    HA->>init: async_setup_entry(hass, entry)
+    init->>client: SocialHomeClient(url, token)
+    init->>coord: SocialHomeCoordinator(hass, client)
+    init->>coord: async_config_entry_first_refresh()
+    coord->>client: c.me.unread_summary()
+    init->>entry: runtime_data = (client, coordinator)
+    init->>view: register inbox view (once per HA process)
+    init->>init: federation.push_base(client, hass.config.external_url)
+    init->>pres: presence.subscribe(hass, client)
+    HA->>init: ✓ ready
+```
+
+`async_unload_entry` tears the same objects down — coordinator stop,
+client close, and presence-bridge unsubscribe. The federation inbox
+view is registered once per HA process and stays mounted; future
+entries reuse it.
+
+## Where state lives
+
+Exactly one place: `ConfigEntry.runtime_data`. It holds a tuple of
+`(SocialHomeClient, SocialHomeCoordinator)`. Everything else is
+either HA-owned (the `hass` object, the entry data) or stateless
+per-request (the inbox view, the federation push).
+
+No `hass.data[DOMAIN]` dict. No module-level globals. This is what
+makes unload safe: when HA tears the entry down, every reference is
+dropped.
+
+## Config flow
+
+Three flows are registered, all in `config_flow.py`:
+
+| Flow | When | Inputs | Validation |
+|---|---|---|---|
+| **User** | Standalone-mode setup | URL + API token | `GET /api/me` round-trip via `SocialHomeClient` |
+| **Hassio discovery** | App-mode auto-discovery | Auto-filled from Supervisor | Same `GET /api/me` round-trip |
+| **Reauth** | After `ConfigEntryAuthFailed` | Token only (URL locked) | Same |
+
+The options flow (re-entered any time) toggles four feature flags:
+
+- `sync_location` — enable / disable the presence bridge.
+- `sync_calendar` — push HA calendars into Social Home.
+- `sync_space_calendars` — pull space calendars into HA as
+  read-only `calendar.*` entities (queued for the calendar PR).
+- `sync_shopping` — sync the HA shopping list with the household
+  shopping list.
+
+## Coordinator
+
+`SocialHomeCoordinator` is a `DataUpdateCoordinator` that polls
+`GET /api/me/unread-summary` on a fixed interval (the default lives
+in `const.py`). It exists today as the data feed for entities that
+will land in follow-up PRs (sensor, notification badge, …).
+
+Exception mapping:
+
+```python
+try:
+    return await client.me.unread_summary()
+except SHAuthError as e:
+    raise ConfigEntryAuthFailed from e
+except SHClientError as e:
+    raise UpdateFailed from e
+```
+
+Nothing else escapes. New endpoints the coordinator polls go through
+the same mapping.
+
+## Federation base URL push (§7.10)
+
+When HA's external URL changes, paired Social Home households need
+to know — otherwise federation envelopes can't reach this household
+through HA's reverse proxy. `federation.py` does two things:
+
+1. On setup, push the current `hass.config.external_url` (or
+   `internal_url` if external is unset) to
+   `POST /api/me/federation-base`.
+2. Subscribe to the `core_config_updated` bus event; on every fire,
+   re-push the URL.
+
+The push is idempotent and best-effort — a failure logs a warning
+but doesn't block setup.
+
+## Federation inbox view (§7.12, §11)
+
+`federation_inbox.py` registers a public HTTP view at
+`/api/social_home/inbox/{inbox_id}`. Inbound federation envelopes
+posted there are forwarded verbatim to the upstream HFS via
+`SocialHomeClient.federation.forward_inbox_envelope()` — body bytes,
+status code, content-type all proxied without parsing. The
+integration is a transparent relay; it never inspects envelope
+contents.
+
+This view is registered **once per HA process**. Multi-account
+setups (one HA → two Social Home instances) use the inbox-id path
+parameter to route to the right runtime client.
+
+## Presence bridge (§7.3)
+
+`presence.py` subscribes to `state_changed` events for `person.*`
+entities and forwards qualifying updates to
+`POST /api/presence/location`. Three gates protect the user before
+any GPS coordinate leaves HA:
+
+1. **Accuracy cap:** drop coordinates with `gps_accuracy_m > 500`
+   (still push the zone so automations keep working).
+2. **Distance dedup:** skip if the new position is within 50 m of
+   the last forwarded position (haversine).
+3. **4dp truncation:** `round(float(lat), 4)` before the API call —
+   matches the §4 invariant on the Social Home side.
+
+The bridge is enabled / disabled by the `sync_location` option;
+toggling the option re-subscribes / unsubscribes without reloading
+the entry.
+
+## Where things live
+
+| Concern | Path |
+|---|---|
+| Setup / unload entry | `custom_components/social_home/__init__.py` |
+| Domain constants | `custom_components/social_home/const.py` |
+| Config flow + options | `custom_components/social_home/config_flow.py` |
+| Polling coordinator | `custom_components/social_home/coordinator.py` |
+| Federation base URL | `custom_components/social_home/federation.py` |
+| Federation inbox view | `custom_components/social_home/federation_inbox.py` |
+| Presence bridge | `custom_components/social_home/presence.py` |
+| Tests (mirror layout) | `tests/` |
+
+Future platform modules (`sensor.py`, `calendar.py`, `notify.py`,
+`shopping_list.py`) plug in by adding to `PLATFORMS` in `const.py`
+and forwarding from `__init__.py`.
+
+## Spec references
+
+- §7 — repository overview
+- §7.1 — `manifest.json` shape
+- §7.2 — config flow
+- §7.3 — presence bridge (GPS gates)
+- §7.4 — shopping list bridge (queued)
+- §7.5 — calendar bridge (queued)
+- §7.6 — push notification bridge (queued)
+- §7.7 — sensor platform (queued)
+- §7.8 — SH → HA automation events (queued)
+- §7.9 — WebSocket reconnect strategy (delegated to `socialhome-client`)
+- §7.10 — federation base URL push + integration requirements
+- §7.11 — setup, unload, cleanup lifecycle
+- §7.12 — federation inbox bridge

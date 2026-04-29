@@ -23,7 +23,7 @@ HA from finishing setup.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.const import EVENT_CORE_CONFIG_UPDATE
 from homeassistant.core import Event, HomeAssistant
@@ -88,7 +88,7 @@ async def async_push_federation_base(hass: HomeAssistant, client: SocialHomeClie
 
 
 def async_register_federation_listener(
-    hass: HomeAssistant, entry: ConfigEntry, client: SocialHomeClient
+    hass: HomeAssistant, entry: ConfigEntry[Any], client: SocialHomeClient
 ) -> None:
     """Re-push the external URL whenever HA's core config changes.
 

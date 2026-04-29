@@ -172,7 +172,7 @@ class SocialHomeConfigFlow(ConfigFlow, domain=DOMAIN):
             step_id="reauth_confirm", data_schema=REAUTH_SCHEMA, errors=errors
         )
 
-    def _get_reauth_entry(self) -> ConfigEntry:
+    def _get_reauth_entry(self) -> ConfigEntry[Any]:
         """Return the entry being re-authed — guaranteed when the
         flow's source is ``SOURCE_REAUTH``."""
         if self.source != SOURCE_REAUTH:
@@ -185,7 +185,7 @@ class SocialHomeConfigFlow(ConfigFlow, domain=DOMAIN):
     # ── Options flow ────────────────────────────────────────────────────
 
     @staticmethod
-    def async_get_options_flow(entry: ConfigEntry) -> OptionsFlow:
+    def async_get_options_flow(entry: ConfigEntry[Any]) -> OptionsFlow:
         return SocialHomeOptionsFlow()
 
 

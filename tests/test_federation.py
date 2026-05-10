@@ -23,16 +23,16 @@ from custom_components.social_home.federation import (
 )
 
 
-def _client_with_set_base(
+def _client_with_set_federation_base(
     result: FederationBaseUpdate | Exception,
 ) -> MagicMock:
-    """Build a client mock whose ``federation.set_base`` returns or raises."""
+    """Build a client mock whose ``ha.set_federation_base`` returns or raises."""
     client = MagicMock()
-    client.federation = MagicMock()
+    client.ha = MagicMock()
     if isinstance(result, Exception):
-        client.federation.set_base = AsyncMock(side_effect=result)
+        client.ha.set_federation_base = AsyncMock(side_effect=result)
     else:
-        client.federation.set_base = AsyncMock(return_value=result)
+        client.ha.set_federation_base = AsyncMock(return_value=result)
     return client
 
 
@@ -40,7 +40,7 @@ async def test_push_skipped_when_no_external_url(
     hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """No external URL → no push, no log spam, no exception."""
-    client = _client_with_set_base(
+    client = _client_with_set_federation_base(
         FederationBaseUpdate(ok=True, base="", changed=False, peers_notified=0)
     )
     monkeypatch.setattr(
@@ -50,13 +50,13 @@ async def test_push_skipped_when_no_external_url(
 
     await async_push_federation_base(hass, client)
 
-    client.federation.set_base.assert_not_awaited()
+    client.ha.set_federation_base.assert_not_awaited()
 
 
 async def test_push_sends_resolved_url(
     hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    client = _client_with_set_base(
+    client = _client_with_set_federation_base(
         FederationBaseUpdate(
             ok=True,
             base="https://external.example.org",
@@ -71,14 +71,14 @@ async def test_push_sends_resolved_url(
 
     await async_push_federation_base(hass, client)
 
-    client.federation.set_base.assert_awaited_once_with("https://external.example.org")
+    client.ha.set_federation_base.assert_awaited_once_with("https://external.example.org")
 
 
 async def test_push_resolver_requests_external_preferred(
     hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """The resolver never asks for internal URLs — those mislead peers."""
-    client = _client_with_set_base(
+    client = _client_with_set_federation_base(
         FederationBaseUpdate(ok=True, base="https://x", changed=False, peers_notified=0)
     )
     resolver = MagicMock(return_value="https://x")
@@ -97,7 +97,7 @@ async def test_push_swallows_client_error(
     hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Transient 5xx / connection error is logged and dropped — no raise."""
-    client = _client_with_set_base(SHClientError("boom"))
+    client = _client_with_set_federation_base(SHClientError("boom"))
     monkeypatch.setattr(
         "custom_components.social_home.federation.get_url",
         MagicMock(return_value="https://external.example.org"),
@@ -105,7 +105,7 @@ async def test_push_swallows_client_error(
 
     # Must not raise — federation binding is best-effort.
     await async_push_federation_base(hass, client)
-    client.federation.set_base.assert_awaited_once()
+    client.ha.set_federation_base.assert_awaited_once()
 
 
 async def test_listener_repushes_on_core_config_update(
@@ -114,7 +114,7 @@ async def test_listener_repushes_on_core_config_update(
     config_entry: MockConfigEntry,
 ) -> None:
     """A fresh ``core_config_updated`` event triggers another push."""
-    client = _client_with_set_base(
+    client = _client_with_set_federation_base(
         FederationBaseUpdate(ok=True, base="https://x.test", changed=True, peers_notified=1)
     )
     monkeypatch.setattr(
@@ -128,4 +128,4 @@ async def test_listener_repushes_on_core_config_update(
     hass.bus.async_fire(EVENT_CORE_CONFIG_UPDATE, {})
     await hass.async_block_till_done()
 
-    client.federation.set_base.assert_awaited_once_with("https://x.test")
+    client.ha.set_federation_base.assert_awaited_once_with("https://x.test")

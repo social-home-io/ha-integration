@@ -71,7 +71,7 @@ async def async_push_federation_base(hass: HomeAssistant, client: SocialHomeClie
         _LOGGER.debug("Social Home: no external URL configured in HA; skipping federation push")
         return
     try:
-        result = await client.federation.set_base(url)
+        result = await client.ha.set_federation_base(url)
     except SHClientError as err:
         # Federation binding is best-effort. A transient 5xx or
         # connection reset here must not block setup; the next

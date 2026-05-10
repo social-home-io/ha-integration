@@ -15,7 +15,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
-from socialhome_client import FederationBaseUpdate, UnreadSummary, User
+from socialhome_client import (
+    FederationBaseUpdate,
+    IceServer,
+    IceServersUpdate,
+    UnreadSummary,
+    User,
+)
 
 from custom_components.social_home.const import (
     CONF_TOKEN,
@@ -99,11 +105,13 @@ def mock_client(sample_user: User, sample_unread: UnreadSummary) -> Iterator[Mag
     instance.presence = MagicMock()
     instance.presence.post_location = AsyncMock()
 
-    # Federation helper runs from ``async_setup_entry`` when HA has
-    # an external URL; the default stub succeeds with a no-op
-    # ``changed=False`` response.
-    instance.federation = MagicMock()
-    instance.federation.set_base = AsyncMock(
+    # HA integration namespace — federation base + ICE-server pushes
+    # both run from ``async_setup_entry``. The default stubs succeed
+    # with no-op ``changed=False`` responses so setup completes
+    # without surprises; tests that need to assert specific
+    # behaviour replace these on the per-test mock.
+    instance.ha = MagicMock()
+    instance.ha.set_federation_base = AsyncMock(
         return_value=FederationBaseUpdate(
             ok=True,
             base="https://external.example.org",
@@ -111,7 +119,15 @@ def mock_client(sample_user: User, sample_unread: UnreadSummary) -> Iterator[Mag
             peers_notified=0,
         )
     )
-    instance.federation.get_base = AsyncMock(return_value=None)
+    instance.ha.get_federation_base = AsyncMock(return_value=None)
+    instance.ha.set_ice_servers = AsyncMock(
+        return_value=IceServersUpdate(
+            ok=True,
+            ice_servers=(IceServer(urls=("stun:stun.home-assistant.io:3478",)),),
+            changed=False,
+        )
+    )
+    instance.ha.get_ice_servers = AsyncMock(return_value=[])
 
     instance.close = AsyncMock()
 

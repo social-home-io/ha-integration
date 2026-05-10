@@ -19,6 +19,7 @@ custom_components/social_home/
 ├── coordinator.py         SocialHomeCoordinator (polls /api/me/unread-summary)
 ├── federation.py          federation base URL push + listener
 ├── federation_inbox.py    /api/social_home/inbox/{inbox_id} HTTP view
+├── ice_servers.py         STUN/TURN ICE-server push + listener
 ├── presence.py            person.* state-change → /api/presence/location
 ├── manifest.json          HACS manifest — domain, version, requirements
 ├── strings.json           UI strings (source of truth)
@@ -48,6 +49,7 @@ sequenceDiagram
     init->>entry: runtime_data = (client, coordinator)
     init->>view: register inbox view (once per HA process)
     init->>init: federation.push_base(client, hass.config.external_url)
+    init->>init: ice_servers.push(client, web_rtc.async_get_ice_servers(hass))
     init->>pres: presence.subscribe(hass, client)
     HA->>init: ✓ ready
 ```
@@ -123,6 +125,32 @@ through HA's reverse proxy. `federation.py` does two things:
 The push is idempotent and best-effort — a failure logs a warning
 but doesn't block setup.
 
+## STUN/TURN ICE-server push (§7.10)
+
+The Social Home server runs behind HA's reverse proxy, so it can't
+discover the operator's STUN/TURN setup on its own. HA already
+aggregates that config through
+`homeassistant.components.web_rtc.async_get_ice_servers(hass)`,
+which returns the union of:
+
+* `hass.config.webrtc.ice_servers` — populated from the
+  `homeassistant:` block in `configuration.yaml`;
+* user-YAML registered against the `web_rtc` integration;
+* runtime providers — Nabu Casa Cloud registers a STUN+TURN pair
+  here once the user opts in via cloud preferences.
+
+`ice_servers.py` forwards that list to
+`PUT /api/ha/integration/ice-servers` on setup and on every
+`core_config_updated` fire. The push is best-effort: a transient
+`SHClientError` is logged at WARN and never re-raised. The server
+endpoint is idempotent — pushing an unchanged list is a no-op,
+which is why we can re-push aggressively on every config-change
+signal without worrying about fan-out cost.
+
+`web_rtc` is a hard dependency in `manifest.json` so HA always
+loads it before `social_home`; we never need to guard against its
+absence.
+
 ## Federation inbox view (§7.12, §11)
 
 `federation_inbox.py` registers a public HTTP view at
@@ -165,6 +193,7 @@ the entry.
 | Polling coordinator | `custom_components/social_home/coordinator.py` |
 | Federation base URL | `custom_components/social_home/federation.py` |
 | Federation inbox view | `custom_components/social_home/federation_inbox.py` |
+| STUN/TURN ICE servers | `custom_components/social_home/ice_servers.py` |
 | Presence bridge | `custom_components/social_home/presence.py` |
 | Tests (mirror layout) | `tests/` |
 

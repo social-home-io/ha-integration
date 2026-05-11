@@ -77,7 +77,7 @@ Three flows are registered, all in `config_flow.py`:
 | Flow | When | Inputs | Validation |
 |---|---|---|---|
 | **User** | Standalone-mode setup | URL + API token | `GET /api/me` round-trip via `SocialHomeClient` |
-| **Hassio discovery** | App-mode auto-discovery | Token from Supervisor; URL derived from the discovery's add-on slug (`http://<slug>:8099`) | Same `GET /api/me` round-trip |
+| **Hassio discovery** | App-mode auto-discovery | `host` + `port` + `token` from the add-on's discovery payload (`socialhome >= 2026.5.11` reads them from `GET /addons/self/info`); URL is `http://<host>:<port>` verbatim | Same `GET /api/me` round-trip |
 | **Reauth** | After `ConfigEntryAuthFailed` | Token only (URL locked) | Same |
 
 The options flow (re-entered any time) toggles four feature flags:

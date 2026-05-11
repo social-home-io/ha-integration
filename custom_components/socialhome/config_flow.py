@@ -29,6 +29,7 @@ from homeassistant.helpers.service_info.hassio import HassioServiceInfo
 from socialhome_client import SHAuthError, SHClientError, SocialHomeClient
 
 from .const import (
+    ADDON_HTTP_PORT,
     CONF_TOKEN,
     CONF_URL,
     CONF_USER_ID,
@@ -107,16 +108,21 @@ class SocialHomeConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_hassio(self, discovery_info: HassioServiceInfo) -> ConfigFlowResult:
         """Supervisor pushed a discovery record for the HA App container.
 
-        Core publishes the full payload the integration needs:
-        ``{"service": "socialhome", "config": {"url": …, "token": …}}``.
-        Both fields are required — we abort with ``cannot_connect``
-        if either is missing, since the integration cannot reach
-        the server without them.
+        The add-on's bootstrap publishes only the integration token —
+        ``{"service": "socialhome", "config": {"token": …}}``. The
+        URL is derived here from ``discovery_info.slug``: the
+        Supervisor exposes every add-on under its slug on the
+        ``hassio`` Docker network, so
+        ``http://<slug>:ADDON_HTTP_PORT`` always reaches the same
+        container that pushed the discovery. Mirrors how
+        ``esphome``, ``motioneye``, and the official Hassio
+        examples resolve the add-on hostname — the integration
+        never trusts the add-on to send its own URL.
         """
-        url = str(discovery_info.config.get("url") or "")
         token = str(discovery_info.config.get("token") or "")
-        if not url or not token:
+        if not token:
             return self.async_abort(reason="cannot_connect")
+        url = f"http://{discovery_info.slug}:{ADDON_HTTP_PORT}"
 
         try:
             identity = await _validate(url, token)

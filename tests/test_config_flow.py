@@ -30,18 +30,19 @@ from custom_components.socialhome.const import (
 
 def _hassio_info(
     *,
-    url: str = "http://sh.test",
     token: str = "tok",
-    slug: str = "socialhome",
+    slug: str = "social_home",
 ) -> HassioServiceInfo:
     """Build a hassio discovery payload.
 
-    Matches the payload core publishes: both ``url`` and ``token``
-    are required fields. Tests that want to simulate a bad payload
-    override either one explicitly.
+    Matches the payload the add-on publishes:
+    ``{"service": "socialhome", "config": {"token": …}}``. The URL
+    is derived by the flow from ``slug`` (the Supervisor exposes
+    add-ons under their slug on the hassio Docker network), so
+    tests that want to assert the URL only need to vary the slug.
     """
     return HassioServiceInfo(
-        config={"url": url, "token": token},
+        config={"token": token},
         name="Social Home",
         slug=slug,
         uuid="00000000-0000-0000-0000-000000000001",
@@ -129,11 +130,11 @@ async def test_user_flow_duplicate_is_aborted(
 async def test_hassio_flow_creates_entry_from_payload(
     hass: HomeAssistant, mock_client: MagicMock
 ) -> None:
-    """Core publishes ``{url, token}``; both flow through untouched."""
+    """Add-on publishes ``{token}``; URL is derived from the slug."""
     result = await hass.config_entries.flow.async_init(
         DOMAIN,
         context={"source": config_entries.SOURCE_HASSIO},
-        data=_hassio_info(url="http://sh.test", token="tok"),
+        data=_hassio_info(token="tok", slug="social_home"),
     )
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "hassio_confirm"
@@ -141,26 +142,29 @@ async def test_hassio_flow_creates_entry_from_payload(
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["data"] == {
-        CONF_URL: "http://sh.test",
+        CONF_URL: "http://social_home:8099",
         CONF_TOKEN: "tok",
         CONF_USER_ID: "user-1",
         CONF_USERNAME: "pascal",
     }
 
 
-async def test_hassio_flow_aborts_when_url_missing(hass: HomeAssistant) -> None:
+async def test_hassio_flow_derives_url_per_slug(
+    hass: HomeAssistant, mock_client: MagicMock
+) -> None:
+    """The early-access add-on (slug ``social_home_early``) lands on
+    its own URL — proves the URL is derived from the slug, not
+    hard-coded."""
     result = await hass.config_entries.flow.async_init(
         DOMAIN,
         context={"source": config_entries.SOURCE_HASSIO},
-        data=HassioServiceInfo(
-            config={"token": "tok"},
-            name="Social Home",
-            slug="socialhome",
-            uuid="00000000-0000-0000-0000-000000000002",
-        ),
+        data=_hassio_info(token="tok", slug="social_home_early"),
     )
-    assert result["type"] is FlowResultType.ABORT
-    assert result["reason"] == "cannot_connect"
+    assert result["type"] is FlowResultType.FORM
+
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"][CONF_URL] == "http://social_home_early:8099"
 
 
 async def test_hassio_flow_aborts_when_token_missing(hass: HomeAssistant) -> None:
@@ -168,9 +172,9 @@ async def test_hassio_flow_aborts_when_token_missing(hass: HomeAssistant) -> Non
         DOMAIN,
         context={"source": config_entries.SOURCE_HASSIO},
         data=HassioServiceInfo(
-            config={"url": "http://sh.test"},
+            config={},
             name="Social Home",
-            slug="socialhome",
+            slug="social_home",
             uuid="00000000-0000-0000-0000-000000000003",
         ),
     )
@@ -186,7 +190,7 @@ async def test_hassio_flow_aborts_on_connect_error(
     result = await hass.config_entries.flow.async_init(
         DOMAIN,
         context={"source": config_entries.SOURCE_HASSIO},
-        data=_hassio_info(url="http://sh.test", token="tok"),
+        data=_hassio_info(token="tok"),
     )
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "cannot_connect"
@@ -197,17 +201,18 @@ async def test_hassio_flow_updates_existing_entry(
     mock_client: MagicMock,
     config_entry: MockConfigEntry,
 ) -> None:
-    """Re-discovery swaps URL + token on the already-configured entry."""
+    """Re-discovery swaps token (and the slug-derived URL) on the
+    already-configured entry."""
     config_entry.add_to_hass(hass)
 
     result = await hass.config_entries.flow.async_init(
         DOMAIN,
         context={"source": config_entries.SOURCE_HASSIO},
-        data=_hassio_info(url="http://sh-new.test", token="rotated"),
+        data=_hassio_info(token="rotated", slug="social_home"),
     )
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "already_configured"
-    assert config_entry.data[CONF_URL] == "http://sh-new.test"
+    assert config_entry.data[CONF_URL] == "http://social_home:8099"
     assert config_entry.data[CONF_TOKEN] == "rotated"
 
 

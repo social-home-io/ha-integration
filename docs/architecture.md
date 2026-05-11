@@ -165,8 +165,24 @@ parameter to route to the right runtime client.
 
 `presence.py` subscribes to `state_changed` events for `person.*`
 entities and forwards qualifying updates to
-`POST /api/presence/location`. Three gates protect the user before
-any GPS coordinate leaves HA:
+`POST /api/presence/location`.
+
+**Username resolution.** The `person.<slug>` entity_id is *not* the
+auth-provider username — HA derives the slug from the user's
+display name, which can be anything. The forwarder resolves the
+linked HA user via the entity's `attributes.user_id`, then reads
+the `homeassistant`-provider credential's `username` from
+`hass.auth.async_get_user(user_id).credentials` (the same path
+`config/auth/list` and the Supervisor's `/auth/list` use). That
+matches the username `HaBootstrap` provisions on the SH side, so
+the server's `presence.username → users(username)` FK lines up.
+Person entities without a linked HA user (sensor-only,
+device_tracker-only) and users without a `homeassistant`
+credential (Trusted Networks, command_line auth, …) are skipped —
+the right home for that case is a translation layer on the
+platform, not a guess here.
+
+Three gates protect the user before any GPS coordinate leaves HA:
 
 1. **Accuracy cap:** drop coordinates with `gps_accuracy_m > 500`
    (still push the zone so automations keep working).

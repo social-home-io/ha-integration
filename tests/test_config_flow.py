@@ -1,4 +1,4 @@
-"""Tests for ``custom_components.social_home.config_flow``.
+"""Tests for ``custom_components.socialhome.config_flow``.
 
 Covers all four entry paths (user, hassio, reauth, options) and
 their error branches so every form error string in ``strings.json``
@@ -16,7 +16,7 @@ from homeassistant.helpers.service_info.hassio import HassioServiceInfo
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from socialhome_client import SHAuthError, SHClientError
 
-from custom_components.social_home.const import (
+from custom_components.socialhome.const import (
     CONF_TOKEN,
     CONF_URL,
     CONF_USER_ID,
@@ -32,7 +32,7 @@ def _hassio_info(
     *,
     url: str = "http://sh.test",
     token: str = "tok",
-    slug: str = "social_home",
+    slug: str = "socialhome",
 ) -> HassioServiceInfo:
     """Build a hassio discovery payload.
 
@@ -155,7 +155,7 @@ async def test_hassio_flow_aborts_when_url_missing(hass: HomeAssistant) -> None:
         data=HassioServiceInfo(
             config={"token": "tok"},
             name="Social Home",
-            slug="social_home",
+            slug="socialhome",
             uuid="00000000-0000-0000-0000-000000000002",
         ),
     )
@@ -170,7 +170,7 @@ async def test_hassio_flow_aborts_when_token_missing(hass: HomeAssistant) -> Non
         data=HassioServiceInfo(
             config={"url": "http://sh.test"},
             name="Social Home",
-            slug="social_home",
+            slug="socialhome",
             uuid="00000000-0000-0000-0000-000000000003",
         ),
     )

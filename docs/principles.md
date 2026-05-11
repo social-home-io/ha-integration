@@ -30,7 +30,7 @@ of the social-home project uses (`socialhome`, `socialhome-client`,
 
 The only runtime deps beyond Home Assistant are `socialhome-client`
 (declared in `manifest.json`'s `requirements`) and Python stdlib.
-The Social Home core (`social_home` package) lives in a separate
+The Social Home core (`socialhome` package) lives in a separate
 repo, runs Python 3.14, and would drag a large dependency graph into
 HA Core if imported. The integration crosses the boundary only over
 HTTP + WS via `socialhome-client`.

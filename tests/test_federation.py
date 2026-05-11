@@ -1,4 +1,4 @@
-"""Tests for ``custom_components.social_home.federation``.
+"""Tests for ``custom_components.socialhome.federation``.
 
 Covers the resolve-and-push helper, transient-error swallowing,
 and the re-push listener for ``core_config_updated``. These tests
@@ -17,7 +17,7 @@ from homeassistant.helpers.network import NoURLAvailableError
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from socialhome_client import FederationBaseUpdate, SHClientError
 
-from custom_components.social_home.federation import (
+from custom_components.socialhome.federation import (
     async_push_federation_base,
     async_register_federation_listener,
 )
@@ -44,7 +44,7 @@ async def test_push_skipped_when_no_external_url(
         FederationBaseUpdate(ok=True, base="", changed=False, peers_notified=0)
     )
     monkeypatch.setattr(
-        "custom_components.social_home.federation.get_url",
+        "custom_components.socialhome.federation.get_url",
         MagicMock(side_effect=NoURLAvailableError),
     )
 
@@ -65,7 +65,7 @@ async def test_push_sends_resolved_url(
         )
     )
     monkeypatch.setattr(
-        "custom_components.social_home.federation.get_url",
+        "custom_components.socialhome.federation.get_url",
         MagicMock(return_value="https://external.example.org"),
     )
 
@@ -82,7 +82,7 @@ async def test_push_resolver_requests_external_preferred(
         FederationBaseUpdate(ok=True, base="https://x", changed=False, peers_notified=0)
     )
     resolver = MagicMock(return_value="https://x")
-    monkeypatch.setattr("custom_components.social_home.federation.get_url", resolver)
+    monkeypatch.setattr("custom_components.socialhome.federation.get_url", resolver)
 
     await async_push_federation_base(hass, client)
 
@@ -99,7 +99,7 @@ async def test_push_swallows_client_error(
     """Transient 5xx / connection error is logged and dropped — no raise."""
     client = _client_with_set_federation_base(SHClientError("boom"))
     monkeypatch.setattr(
-        "custom_components.social_home.federation.get_url",
+        "custom_components.socialhome.federation.get_url",
         MagicMock(return_value="https://external.example.org"),
     )
 
@@ -118,7 +118,7 @@ async def test_listener_repushes_on_core_config_update(
         FederationBaseUpdate(ok=True, base="https://x.test", changed=True, peers_notified=1)
     )
     monkeypatch.setattr(
-        "custom_components.social_home.federation.get_url",
+        "custom_components.socialhome.federation.get_url",
         MagicMock(return_value="https://x.test"),
     )
 

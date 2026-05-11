@@ -1,4 +1,4 @@
-"""Tests for ``custom_components.social_home.presence``.
+"""Tests for ``custom_components.socialhome.presence``.
 
 Drive the listener directly by firing ``state_changed`` events on
 the real HA bus, then inspect what the fake
@@ -16,7 +16,7 @@ from homeassistant.core import HomeAssistant, State
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from socialhome_client import SHClientError
 
-from custom_components.social_home.presence import async_setup_presence
+from custom_components.socialhome.presence import async_setup_presence
 
 
 def _client() -> MagicMock:

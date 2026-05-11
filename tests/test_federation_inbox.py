@@ -1,4 +1,4 @@
-"""Tests for ``custom_components.social_home.federation_inbox``.
+"""Tests for ``custom_components.socialhome.federation_inbox``.
 
 The view is an HTTP passthrough — each test drives it through a
 real aiohttp test client (``hass_client_no_auth``) and asserts the
@@ -43,7 +43,7 @@ async def test_inbox_post_mirrors_addon_response(
     client = await hass_client_no_auth()
 
     resp = await client.post(
-        "/api/social_home/inbox/wh-peer",
+        "/api/socialhome/inbox/wh-peer",
         data=b'{"msg_id":"m1"}',
         headers={"Content-Type": "application/octet-stream"},
     )
@@ -75,7 +75,7 @@ async def test_inbox_post_passes_signature_header(
     client = await hass_client_no_auth()
 
     await client.post(
-        "/api/social_home/inbox/wh-peer",
+        "/api/socialhome/inbox/wh-peer",
         data=b"{}",
         headers={"X-SocialHome-Signature": "ed25:abc"},
     )
@@ -102,7 +102,7 @@ async def test_inbox_post_non_2xx_is_passed_through(
     await _setup(hass, config_entry, mock_client, mock_ws_manager)
     client = await hass_client_no_auth()
 
-    resp = await client.post("/api/social_home/inbox/wh-peer", data=b"{}")
+    resp = await client.post("/api/socialhome/inbox/wh-peer", data=b"{}")
 
     assert resp.status == 410
     assert await resp.read() == b'{"error":"Replay detected"}'
@@ -135,7 +135,7 @@ async def test_inbox_post_forwards_large_body_to_addon(
     # 2 MiB — comfortably above the spec's old envelope-only cap,
     # well below HA's ``client_max_size`` (16 MiB default).
     big = b"x" * (2 * 1024 * 1024)
-    resp = await client.post("/api/social_home/inbox/wh-peer", data=big)
+    resp = await client.post("/api/socialhome/inbox/wh-peer", data=big)
 
     assert resp.status == 200
     assert captured["inbox_id"] == b"wh-peer"
@@ -155,7 +155,7 @@ async def test_inbox_post_maps_client_error_to_bad_gateway(
     await _setup(hass, config_entry, mock_client, mock_ws_manager)
     client = await hass_client_no_auth()
 
-    resp = await client.post("/api/social_home/inbox/wh-peer", data=b"{}")
+    resp = await client.post("/api/socialhome/inbox/wh-peer", data=b"{}")
     assert resp.status == 502
 
 
@@ -175,7 +175,7 @@ async def test_inbox_view_requires_no_auth(
     # would mean the view was wired with ``requires_auth`` left on
     # its default. Expect 200.
     client = await hass_client_no_auth()
-    resp = await client.post("/api/social_home/inbox/wh-peer", data=b"{}")
+    resp = await client.post("/api/socialhome/inbox/wh-peer", data=b"{}")
     assert resp.status == 200
 
 

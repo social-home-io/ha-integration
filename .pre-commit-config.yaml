@@ -44,7 +44,7 @@ repos:
     rev: v1.13.0
     hooks:
       - id: mypy
-        name: mypy (custom_components/social_home, strict)
+        name: mypy (custom_components/socialhome, strict)
         # mypy needs the same runtime deps CI pulls in so it can
         # resolve the integration's imports. Keep this list in
         # lock-step with ``requirements_test.txt``.
@@ -52,6 +52,6 @@ repos:
           - "homeassistant>=2026.4"
           - "socialhome-client>=2026.4.24"
           - "voluptuous>=0.14"
-        args: ["--config-file=pyproject.toml", "custom_components/social_home"]
+        args: ["--config-file=pyproject.toml", "custom_components/socialhome"]
         always_run: true
         pass_filenames: false

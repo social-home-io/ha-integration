@@ -5,7 +5,7 @@ Instruction file for Claude Code. Read before editing.
 ## What this is
 
 Home Assistant custom integration for Social Home. Distributed via
-HACS under the domain `social_home`. Spec: §7 of `spec_work.md` in
+HACS under the domain `socialhome`. Spec: §7 of `spec_work.md` in
 the Social Home meta-repo.
 
 The integration is a thin bridge — the heavy lifting lives in
@@ -25,7 +25,7 @@ config flow, coordinator, entity platforms.
   publish). Match the convention the rest of the social-home
   project uses (``socialhome``, ``socialhome-client``, ``ha-app``,
   …) — semver tags will fail HACS + the release workflow.
-- **Never import from `social_home` (core).** The only runtime
+- **Never import from `socialhome` (core).** The only runtime
   dependency beyond Home Assistant is `socialhome-client>=1.0.0`
   (declared in `manifest.json`).
 - **All I/O is async.** No `time.sleep`, no blocking calls. HA
@@ -49,7 +49,7 @@ config flow, coordinator, entity platforms.
 ## Layout
 
 ```
-custom_components/social_home/
+custom_components/socialhome/
   manifest.json         # HACS manifest — domain, version, requirements
   __init__.py           # async_setup_entry / async_unload_entry
   const.py              # DOMAIN, platform list, option keys, defaults
@@ -70,7 +70,7 @@ initial skeleton — the spec drops them in per-platform.
 pip install -e .[dev]
 pytest                      # ≥85 % branch coverage gate
 ruff check custom_components/ tests/
-mypy custom_components/social_home/
+mypy custom_components/socialhome/
 ```
 
 Tests use stub fakes for the HA `HomeAssistant` / `ConfigEntry`

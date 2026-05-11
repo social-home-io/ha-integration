@@ -1,7 +1,7 @@
 # Architecture
 
 How the integration fits together. Distilled from §7 of `spec_work.md`
-plus the current code under `custom_components/social_home/`.
+plus the current code under `custom_components/socialhome/`.
 
 The integration is a **skeleton with already-shipped bridges** — config
 flow, coordinator, federation base URL push, the federation inbox HTTP
@@ -12,13 +12,13 @@ the platforms list in `const.py` is intentionally empty for now.
 ## Module layout
 
 ```
-custom_components/social_home/
+custom_components/socialhome/
 ├── __init__.py            async_setup_entry / async_unload_entry
 ├── const.py               DOMAIN, platform list, option keys, defaults
 ├── config_flow.py         user + Hassio + reauth + options flows
 ├── coordinator.py         SocialHomeCoordinator (polls /api/me/unread-summary)
 ├── federation.py          federation base URL push + listener
-├── federation_inbox.py    /api/social_home/inbox/{inbox_id} HTTP view
+├── federation_inbox.py    /api/socialhome/inbox/{inbox_id} HTTP view
 ├── ice_servers.py         STUN/TURN ICE-server push + listener
 ├── presence.py            person.* state-change → /api/presence/location
 ├── manifest.json          HACS manifest — domain, version, requirements
@@ -148,13 +148,13 @@ which is why we can re-push aggressively on every config-change
 signal without worrying about fan-out cost.
 
 `web_rtc` is a hard dependency in `manifest.json` so HA always
-loads it before `social_home`; we never need to guard against its
+loads it before `socialhome`; we never need to guard against its
 absence.
 
 ## Federation inbox view (§7.12, §11)
 
 `federation_inbox.py` registers a public HTTP view at
-`/api/social_home/inbox/{inbox_id}`. Inbound federation envelopes
+`/api/socialhome/inbox/{inbox_id}`. Inbound federation envelopes
 posted there are forwarded verbatim to the upstream HFS via
 `SocialHomeClient.federation.forward_inbox_envelope()` — body bytes,
 status code, content-type all proxied without parsing. The
@@ -187,14 +187,14 @@ the entry.
 
 | Concern | Path |
 |---|---|
-| Setup / unload entry | `custom_components/social_home/__init__.py` |
-| Domain constants | `custom_components/social_home/const.py` |
-| Config flow + options | `custom_components/social_home/config_flow.py` |
-| Polling coordinator | `custom_components/social_home/coordinator.py` |
-| Federation base URL | `custom_components/social_home/federation.py` |
-| Federation inbox view | `custom_components/social_home/federation_inbox.py` |
-| STUN/TURN ICE servers | `custom_components/social_home/ice_servers.py` |
-| Presence bridge | `custom_components/social_home/presence.py` |
+| Setup / unload entry | `custom_components/socialhome/__init__.py` |
+| Domain constants | `custom_components/socialhome/const.py` |
+| Config flow + options | `custom_components/socialhome/config_flow.py` |
+| Polling coordinator | `custom_components/socialhome/coordinator.py` |
+| Federation base URL | `custom_components/socialhome/federation.py` |
+| Federation inbox view | `custom_components/socialhome/federation_inbox.py` |
+| STUN/TURN ICE servers | `custom_components/socialhome/ice_servers.py` |
+| Presence bridge | `custom_components/socialhome/presence.py` |
 | Tests (mirror layout) | `tests/` |
 
 Future platform modules (`sensor.py`, `calendar.py`, `notify.py`,

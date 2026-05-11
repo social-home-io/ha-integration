@@ -1,4 +1,4 @@
-"""Tests for ``custom_components.social_home.__init__``.
+"""Tests for ``custom_components.socialhome.__init__``.
 
 Covers ``async_setup_entry`` success + failure paths and
 ``async_unload_entry`` cleanup.
@@ -14,8 +14,8 @@ from homeassistant.core import HomeAssistant, State
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from socialhome_client import SHAuthError, SHClientError
 
-from custom_components.social_home import SocialHomeRuntimeData
-from custom_components.social_home.const import CONF_TOKEN, CONF_URL
+from custom_components.socialhome import SocialHomeRuntimeData
+from custom_components.socialhome.const import CONF_TOKEN, CONF_URL
 
 
 async def test_setup_entry_success(
@@ -55,7 +55,7 @@ async def test_setup_entry_auth_failure_triggers_reauth(
     # Client was closed so we don't leak a session.
     mock_client.return_value.close.assert_awaited()
     # HA should now be running a re-auth flow.
-    flows = hass.config_entries.flow.async_progress_by_handler("social_home")
+    flows = hass.config_entries.flow.async_progress_by_handler("socialhome")
     assert any(f["context"].get("source") == "reauth" for f in flows)
 
 

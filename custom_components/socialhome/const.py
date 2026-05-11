@@ -49,17 +49,6 @@ DEFAULT_SYNC_CALENDAR: Final = True
 DEFAULT_SYNC_SPACE_CALENDARS: Final = False
 DEFAULT_SYNC_SHOPPING: Final = True
 
-# ── Hassio discovery ────────────────────────────────────────────────────
-
-#: Port the Social Home add-on's HTTP server listens on inside its
-#: container — matches ``listen_port`` in the upstream
-#: ``socialhome.config`` defaults. The Supervisor exposes the
-#: add-on's container under its slug on the hassio Docker network,
-#: so the integration reaches it at
-#: ``http://<addon_slug>:ADDON_HTTP_PORT`` without needing the
-#: Supervisor to publish a URL in the discovery payload.
-ADDON_HTTP_PORT: Final = 8099
-
 # ── Coordinator tuning ──────────────────────────────────────────────────
 
 #: How often the shared coordinator polls

@@ -29,7 +29,6 @@ from homeassistant.helpers.service_info.hassio import HassioServiceInfo
 from socialhome_client import SHAuthError, SHClientError, SocialHomeClient
 
 from .const import (
-    ADDON_HTTP_PORT,
     CONF_TOKEN,
     CONF_URL,
     CONF_USER_ID,
@@ -108,21 +107,22 @@ class SocialHomeConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_hassio(self, discovery_info: HassioServiceInfo) -> ConfigFlowResult:
         """Supervisor pushed a discovery record for the HA App container.
 
-        The add-on's bootstrap publishes only the integration token —
-        ``{"service": "socialhome", "config": {"token": …}}``. The
-        URL is derived here from ``discovery_info.slug``: the
-        Supervisor exposes every add-on under its slug on the
-        ``hassio`` Docker network, so
-        ``http://<slug>:ADDON_HTTP_PORT`` always reaches the same
-        container that pushed the discovery. Mirrors how
-        ``esphome``, ``motioneye``, and the official Hassio
-        examples resolve the add-on hostname — the integration
-        never trusts the add-on to send its own URL.
+        The add-on's ``HaBootstrap`` advertises everything we need
+        in the payload — ``host`` (the container hostname as the
+        Supervisor sees it on the hassio Docker network), ``port``
+        (the server's ``listen_port``, propagated from the add-on's
+        ``ingress_port``), and the integration ``token``. We refuse
+        to guess any of them: an incomplete payload means an
+        out-of-date add-on, and falling back to a hard-coded URL
+        would just create a flow that breaks at ``_validate``
+        without a useful error.
         """
+        host = str(discovery_info.config.get("host") or "")
+        port = discovery_info.config.get("port")
         token = str(discovery_info.config.get("token") or "")
-        if not token:
+        if not host or not port or not token:
             return self.async_abort(reason="cannot_connect")
-        url = f"http://{discovery_info.slug}:{ADDON_HTTP_PORT}"
+        url = f"http://{host}:{int(port)}"
 
         try:
             identity = await _validate(url, token)

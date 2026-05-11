@@ -30,19 +30,21 @@ from custom_components.socialhome.const import (
 
 def _hassio_info(
     *,
+    host: str = "local-social-home",
+    port: int = 8099,
     token: str = "tok",
-    slug: str = "social_home",
+    slug: str = "local_social_home",
 ) -> HassioServiceInfo:
     """Build a hassio discovery payload.
 
-    Matches the payload the add-on publishes:
-    ``{"service": "socialhome", "config": {"token": …}}``. The URL
-    is derived by the flow from ``slug`` (the Supervisor exposes
-    add-ons under their slug on the hassio Docker network), so
-    tests that want to assert the URL only need to vary the slug.
+    Matches the payload the add-on publishes starting with
+    ``socialhome >= 2026.5.11`` —
+    ``{"service": "socialhome", "config": {"host": …, "port": …, "token": …}}``.
+    Defaults reflect what the Supervisor reports for the stable
+    add-on (``/addons/local_social_home/info``).
     """
     return HassioServiceInfo(
-        config={"token": token},
+        config={"host": host, "port": port, "token": token},
         name="Social Home",
         slug=slug,
         uuid="00000000-0000-0000-0000-000000000001",
@@ -130,11 +132,12 @@ async def test_user_flow_duplicate_is_aborted(
 async def test_hassio_flow_creates_entry_from_payload(
     hass: HomeAssistant, mock_client: MagicMock
 ) -> None:
-    """Add-on publishes ``{token}``; URL is derived from the slug."""
+    """The add-on advertises host + port + token; all three flow
+    into the config entry untouched."""
     result = await hass.config_entries.flow.async_init(
         DOMAIN,
         context={"source": config_entries.SOURCE_HASSIO},
-        data=_hassio_info(token="tok", slug="social_home"),
+        data=_hassio_info(host="local-social-home", port=8099, token="tok"),
     )
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "hassio_confirm"
@@ -142,29 +145,67 @@ async def test_hassio_flow_creates_entry_from_payload(
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["data"] == {
-        CONF_URL: "http://social_home:8099",
+        CONF_URL: "http://local-social-home:8099",
         CONF_TOKEN: "tok",
         CONF_USER_ID: "user-1",
         CONF_USERNAME: "pascal",
     }
 
 
-async def test_hassio_flow_derives_url_per_slug(
+async def test_hassio_flow_honours_payload_host_and_port(
     hass: HomeAssistant, mock_client: MagicMock
 ) -> None:
-    """The early-access add-on (slug ``social_home_early``) lands on
-    its own URL — proves the URL is derived from the slug, not
-    hard-coded."""
+    """A non-default host/port pair (e.g. the early-access add-on
+    with a custom ``listen_port``) is used verbatim — no
+    substitution, no fallback constants."""
     result = await hass.config_entries.flow.async_init(
         DOMAIN,
         context={"source": config_entries.SOURCE_HASSIO},
-        data=_hassio_info(token="tok", slug="social_home_early"),
+        data=_hassio_info(
+            host="local-social-home-early",
+            port=18099,
+            token="tok",
+            slug="local_social_home_early",
+        ),
     )
     assert result["type"] is FlowResultType.FORM
 
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert result["data"][CONF_URL] == "http://social_home_early:8099"
+    assert result["data"][CONF_URL] == "http://local-social-home-early:18099"
+
+
+async def test_hassio_flow_aborts_when_host_missing(hass: HomeAssistant) -> None:
+    """Old add-on releases that pre-date the ``host``/``port`` payload
+    have no useful URL to validate — surface that as
+    ``cannot_connect`` rather than guessing."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": config_entries.SOURCE_HASSIO},
+        data=HassioServiceInfo(
+            config={"port": 8099, "token": "tok"},
+            name="Social Home",
+            slug="local_social_home",
+            uuid="00000000-0000-0000-0000-000000000004",
+        ),
+    )
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "cannot_connect"
+
+
+async def test_hassio_flow_aborts_when_port_missing(hass: HomeAssistant) -> None:
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": config_entries.SOURCE_HASSIO},
+        data=HassioServiceInfo(
+            config={"host": "local-social-home", "token": "tok"},
+            name="Social Home",
+            slug="local_social_home",
+            uuid="00000000-0000-0000-0000-000000000005",
+        ),
+    )
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "cannot_connect"
 
 
 async def test_hassio_flow_aborts_when_token_missing(hass: HomeAssistant) -> None:
@@ -172,9 +213,9 @@ async def test_hassio_flow_aborts_when_token_missing(hass: HomeAssistant) -> Non
         DOMAIN,
         context={"source": config_entries.SOURCE_HASSIO},
         data=HassioServiceInfo(
-            config={},
+            config={"host": "local-social-home", "port": 8099},
             name="Social Home",
-            slug="social_home",
+            slug="local_social_home",
             uuid="00000000-0000-0000-0000-000000000003",
         ),
     )
@@ -190,7 +231,7 @@ async def test_hassio_flow_aborts_on_connect_error(
     result = await hass.config_entries.flow.async_init(
         DOMAIN,
         context={"source": config_entries.SOURCE_HASSIO},
-        data=_hassio_info(token="tok"),
+        data=_hassio_info(),
     )
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "cannot_connect"
@@ -201,18 +242,18 @@ async def test_hassio_flow_updates_existing_entry(
     mock_client: MagicMock,
     config_entry: MockConfigEntry,
 ) -> None:
-    """Re-discovery swaps token (and the slug-derived URL) on the
-    already-configured entry."""
+    """Re-discovery swaps the URL (host + port from the payload)
+    and the rotated token on the already-configured entry."""
     config_entry.add_to_hass(hass)
 
     result = await hass.config_entries.flow.async_init(
         DOMAIN,
         context={"source": config_entries.SOURCE_HASSIO},
-        data=_hassio_info(token="rotated", slug="social_home"),
+        data=_hassio_info(host="local-social-home", port=8099, token="rotated"),
     )
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "already_configured"
-    assert config_entry.data[CONF_URL] == "http://social_home:8099"
+    assert config_entry.data[CONF_URL] == "http://local-social-home:8099"
     assert config_entry.data[CONF_TOKEN] == "rotated"
 
 

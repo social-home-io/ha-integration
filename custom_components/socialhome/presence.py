@@ -73,6 +73,7 @@ def _ha_username(user: User | None) -> str | None:
         None,
     )
 
+
 #: Above this accuracy (in metres) the location is treated as "no
 #: useful fix" — we still push the zone so automations keep working.
 _ACCURACY_CAP_M = 500.0

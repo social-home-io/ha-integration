@@ -122,6 +122,17 @@ async def test_config_entry_url_and_token_wired(
     mock_client.assert_called_once_with(config_entry.data[CONF_URL], config_entry.data[CONF_TOKEN])
 
 
+def _seed_person_user(hass: HomeAssistant, *, ha_username: str = "pascal") -> None:
+    """Wire ``hass.auth.async_get_user`` so the presence forwarder can
+    resolve the linked HA user's auth-provider username."""
+    cred = MagicMock()
+    cred.auth_provider_type = "homeassistant"
+    cred.data = {"username": ha_username}
+    user = MagicMock()
+    user.credentials = [cred]
+    hass.auth.async_get_user = AsyncMock(return_value=user)
+
+
 async def test_setup_attaches_presence_listener_when_option_on(
     hass: HomeAssistant,
     config_entry: MockConfigEntry,
@@ -131,12 +142,17 @@ async def test_setup_attaches_presence_listener_when_option_on(
     config_entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(config_entry.entry_id)
     await hass.async_block_till_done()
+    _seed_person_user(hass)
 
     hass.bus.async_fire(
         EVENT_STATE_CHANGED,
         {
             "entity_id": "person.pascal",
-            "new_state": State("person.pascal", "home", {"latitude": 1.0, "longitude": 2.0}),
+            "new_state": State(
+                "person.pascal",
+                "home",
+                {"latitude": 1.0, "longitude": 2.0, "user_id": "user-abc"},
+            ),
             "old_state": None,
         },
     )
@@ -155,12 +171,17 @@ async def test_setup_skips_presence_listener_when_option_off(
     hass.config_entries.async_update_entry(config_entry, options={"sync_location": False})
     assert await hass.config_entries.async_setup(config_entry.entry_id)
     await hass.async_block_till_done()
+    _seed_person_user(hass)
 
     hass.bus.async_fire(
         EVENT_STATE_CHANGED,
         {
             "entity_id": "person.pascal",
-            "new_state": State("person.pascal", "home", {"latitude": 1.0, "longitude": 2.0}),
+            "new_state": State(
+                "person.pascal",
+                "home",
+                {"latitude": 1.0, "longitude": 2.0, "user_id": "user-abc"},
+            ),
             "old_state": None,
         },
     )

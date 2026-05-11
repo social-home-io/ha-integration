@@ -33,12 +33,45 @@ from homeassistant.core import Event, EventStateChangedData, HomeAssistant
 from socialhome_client import SHClientError, SocialHomeClient
 
 if TYPE_CHECKING:
+    from homeassistant.auth.models import User
     from homeassistant.config_entries import ConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
 
-#: HA emits ``person.<username>``; strip this prefix to get the SH username.
+#: HA emits ``person.<username>``; the slug is *not* a reliable SH
+#: username — HA derives it from the user's display name, which has
+#: no contract with the auth-provider username the Supervisor
+#: returns on ``/auth/list`` (and that ``HaBootstrap`` provisions
+#: as the SH user). We resolve the real auth-provider username via
+#: the linked ``user_id`` attribute instead.
 _PERSON_PREFIX = "person."
+
+#: HA Core auth-provider type for username/password credentials —
+#: matches ``cred.auth_provider_type`` on the credential the
+#: Supervisor reads when it builds ``/auth/list``.
+_HA_AUTH_PROVIDER = "homeassistant"
+
+
+def _ha_username(user: User | None) -> str | None:
+    """Return the user's ``homeassistant``-auth-provider username.
+
+    Mirrors how HA Core's own ``config/auth/list`` WS command
+    populates ``username`` (see
+    ``homeassistant.components.config.auth._user_info``) — which
+    is what the Supervisor relays to add-ons on ``/auth/list``.
+    Doing the same lookup here keeps the integration aligned with
+    whatever username ``HaBootstrap`` provisioned on the SH side.
+    """
+    if user is None:
+        return None
+    return next(
+        (
+            cred.data.get("username")
+            for cred in user.credentials
+            if cred.auth_provider_type == _HA_AUTH_PROVIDER
+        ),
+        None,
+    )
 
 #: Above this accuracy (in metres) the location is treated as "no
 #: useful fix" — we still push the zone so automations keep working.
@@ -89,8 +122,29 @@ def async_setup_presence(
         if new_state is None:
             return
 
-        username = entity_id[len(_PERSON_PREFIX) :]
         attrs = new_state.attributes
+        ha_user_id = attrs.get("user_id")
+        if not ha_user_id:
+            # Manually-tracked person entity with no linked HA user
+            # (sensor-only, device_tracker-only, etc.). There's no
+            # SH user to push presence for — silently skip. If we
+            # ever want to support these, the right place is a
+            # translation layer on the platform (out of scope for
+            # this module).
+            _LOGGER.debug(
+                "Social Home: %s has no linked HA user — skipping push",
+                entity_id,
+            )
+            return
+        username = _ha_username(await hass.auth.async_get_user(ha_user_id))
+        if not username:
+            _LOGGER.debug(
+                "Social Home: %s → user %s has no homeassistant-provider"
+                " credential — skipping push",
+                entity_id,
+                ha_user_id,
+            )
+            return
         lat_raw = attrs.get("latitude")
         lon_raw = attrs.get("longitude")
         acc_raw = attrs.get("gps_accuracy")

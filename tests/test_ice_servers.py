@@ -1,4 +1,4 @@
-"""Tests for ``custom_components.social_home.ice_servers``.
+"""Tests for ``custom_components.socialhome.ice_servers``.
 
 Covers the resolve-and-push helper, transient-error swallowing,
 and the re-push listener for ``core_config_updated``. Drives the
@@ -18,7 +18,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from socialhome_client import IceServer, IceServersUpdate, SHClientError
 from webrtc_models import RTCIceServer
 
-from custom_components.social_home.ice_servers import (
+from custom_components.socialhome.ice_servers import (
     async_push_ice_servers,
     async_register_ice_servers_listener,
 )
@@ -52,7 +52,7 @@ async def test_push_skipped_when_no_servers(
     """Empty HA list → no push, no log spam, no exception."""
     client = _client_with_set_ice_servers(_ok_update())
     monkeypatch.setattr(
-        "custom_components.social_home.ice_servers.async_get_ice_servers",
+        "custom_components.socialhome.ice_servers.async_get_ice_servers",
         MagicMock(return_value=[]),
     )
 
@@ -75,7 +75,7 @@ async def test_push_sends_serialised_servers(
     ]
     client = _client_with_set_ice_servers(_ok_update())
     monkeypatch.setattr(
-        "custom_components.social_home.ice_servers.async_get_ice_servers",
+        "custom_components.socialhome.ice_servers.async_get_ice_servers",
         MagicMock(return_value=servers),
     )
 
@@ -97,7 +97,7 @@ async def test_push_uses_web_rtc_public_api(
     """The helper delegates to ``web_rtc.async_get_ice_servers``."""
     resolver = MagicMock(return_value=[RTCIceServer(urls=["stun:x.test"])])
     client = _client_with_set_ice_servers(_ok_update())
-    monkeypatch.setattr("custom_components.social_home.ice_servers.async_get_ice_servers", resolver)
+    monkeypatch.setattr("custom_components.socialhome.ice_servers.async_get_ice_servers", resolver)
 
     await async_push_ice_servers(hass, client)
 
@@ -110,7 +110,7 @@ async def test_push_swallows_client_error(
     """Transient 5xx / connection error is logged and dropped — no raise."""
     client = _client_with_set_ice_servers(SHClientError("boom"))
     monkeypatch.setattr(
-        "custom_components.social_home.ice_servers.async_get_ice_servers",
+        "custom_components.socialhome.ice_servers.async_get_ice_servers",
         MagicMock(return_value=[RTCIceServer(urls=["stun:x.test"])]),
     )
 
@@ -127,7 +127,7 @@ async def test_listener_repushes_on_core_config_update(
     """A fresh ``core_config_updated`` event triggers another push."""
     client = _client_with_set_ice_servers(_ok_update())
     monkeypatch.setattr(
-        "custom_components.social_home.ice_servers.async_get_ice_servers",
+        "custom_components.socialhome.ice_servers.async_get_ice_servers",
         MagicMock(return_value=[RTCIceServer(urls=["stun:x.test"])]),
     )
 
@@ -150,11 +150,11 @@ async def test_push_logs_count_when_changed(
         _ok_update([{"urls": ["stun:a.test"]}, {"urls": ["stun:b.test"]}])
     )
     monkeypatch.setattr(
-        "custom_components.social_home.ice_servers.async_get_ice_servers",
+        "custom_components.socialhome.ice_servers.async_get_ice_servers",
         MagicMock(return_value=[RTCIceServer(urls=["stun:a.test"])]),
     )
 
-    with caplog.at_level("INFO", logger="custom_components.social_home.ice_servers"):
+    with caplog.at_level("INFO", logger="custom_components.socialhome.ice_servers"):
         await async_push_ice_servers(hass, client)
 
     assert any("ICE servers updated" in rec.message for rec in caplog.records)
@@ -174,11 +174,11 @@ async def test_push_quiet_when_unchanged(
         )
     )
     monkeypatch.setattr(
-        "custom_components.social_home.ice_servers.async_get_ice_servers",
+        "custom_components.socialhome.ice_servers.async_get_ice_servers",
         MagicMock(return_value=[RTCIceServer(urls=["stun:a.test"])]),
     )
 
-    with caplog.at_level("INFO", logger="custom_components.social_home.ice_servers"):
+    with caplog.at_level("INFO", logger="custom_components.socialhome.ice_servers"):
         await async_push_ice_servers(hass, client)
 
     assert not any("ICE servers updated" in rec.message for rec in caplog.records)

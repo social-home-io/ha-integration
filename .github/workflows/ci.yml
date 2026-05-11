@@ -34,7 +34,7 @@ jobs:
           python-version: "3.14"
           cache: pip
       - run: pip install -r requirements_test.txt
-      - run: mypy custom_components/social_home
+      - run: mypy custom_components/socialhome
 
   test:
     name: pytest
@@ -72,7 +72,7 @@ jobs:
       #
       # ``brands`` is skipped until the integration is registered
       # against the shared https://github.com/home-assistant/brands
-      # repo (or we drop an icon into custom_components/social_home/
+      # repo (or we drop an icon into custom_components/socialhome/
       # brand/). Revisit once the logo asset is ready.
       - uses: hacs/action@main
         with:

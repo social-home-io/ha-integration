@@ -2,8 +2,8 @@
 
 We lean on ``pytest-homeassistant-custom-component`` for the real
 ``hass`` fixture. The ``enable_custom_integrations`` auto-use
-fixture wires our ``custom_components/social_home`` tree into HA's
-component loader so ``MockConfigEntry(domain="social_home")`` picks
+fixture wires our ``custom_components/socialhome`` tree into HA's
+component loader so ``MockConfigEntry(domain="socialhome")`` picks
 it up.
 """
 
@@ -23,7 +23,7 @@ from socialhome_client import (
     User,
 )
 
-from custom_components.social_home.const import (
+from custom_components.socialhome.const import (
     CONF_TOKEN,
     CONF_URL,
     CONF_USER_ID,
@@ -41,7 +41,7 @@ _ROOT = Path(__file__).resolve().parent.parent
 def _auto_enable_custom_integrations(
     enable_custom_integrations: None,
 ) -> None:
-    """Load ``custom_components.social_home`` as a real HA integration."""
+    """Load ``custom_components.socialhome`` as a real HA integration."""
     return None
 
 
@@ -137,8 +137,8 @@ def mock_client(sample_user: User, sample_unread: UnreadSummary) -> Iterator[Mag
 
     factory = MagicMock(return_value=instance)
     with (
-        patch("custom_components.social_home.SocialHomeClient", factory),
-        patch("custom_components.social_home.config_flow.SocialHomeClient", factory),
+        patch("custom_components.socialhome.SocialHomeClient", factory),
+        patch("custom_components.socialhome.config_flow.SocialHomeClient", factory),
     ):
         # Expose the factory so tests can assert call args; the
         # instance is reachable via ``mock_client.return_value``.
@@ -157,5 +157,5 @@ def mock_ws_manager() -> Iterator[MagicMock]:
     instance.disconnect = AsyncMock()
     instance.register = MagicMock(return_value=lambda: None)
     factory = MagicMock(return_value=instance)
-    with patch("custom_components.social_home.coordinator.SocialHomeWsManager", factory):
+    with patch("custom_components.socialhome.coordinator.SocialHomeWsManager", factory):
         yield factory

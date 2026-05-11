@@ -4,7 +4,7 @@ Spec §7.3. Subscribes to ``state_changed`` on the HA event bus and,
 for ``person.*`` entities, pushes the current location to
 ``POST /api/presence/location`` on the Social Home instance. This
 module deliberately does **not** register any HA entities — it is a
-one-way forwarder; `sensor.social_home_presence` is owned by core
+one-way forwarder; `sensor.socialhome_presence` is owned by core
 and the SH web UI.
 
 Three guards keep the push cheap and safe:

@@ -46,7 +46,7 @@ _INBOX_VIEW_REGISTERED: Final = "inbox_view_registered"
 
 
 class SocialHomeFederationInboxView(HomeAssistantView):
-    """Public inbox at ``/api/social_home/inbox/{inbox_id}``.
+    """Public inbox at ``/api/socialhome/inbox/{inbox_id}``.
 
     One view serves every config entry — ``inbox_id`` is the unique
     tag a peer was handed at pairing time, and it fully identifies
@@ -56,8 +56,8 @@ class SocialHomeFederationInboxView(HomeAssistantView):
     references.
     """
 
-    url = "/api/social_home/inbox/{inbox_id}"
-    name = "api:social_home:inbox"
+    url = "/api/socialhome/inbox/{inbox_id}"
+    name = "api:socialhome:inbox"
     requires_auth = False
 
     def __init__(self, hass: HomeAssistant) -> None:

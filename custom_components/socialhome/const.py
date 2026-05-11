@@ -12,7 +12,7 @@ from typing import Final
 from homeassistant.const import Platform
 
 #: HA integration domain. Matches ``manifest.json``.
-DOMAIN: Final = "social_home"
+DOMAIN: Final = "socialhome"
 
 #: Platforms the integration forwards to. Empty in the initial
 #: skeleton — entity platforms (sensor, calendar, notify, …) are

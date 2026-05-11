@@ -1,4 +1,4 @@
-"""Tests for ``custom_components.social_home.coordinator``.
+"""Tests for ``custom_components.socialhome.coordinator``.
 
 The coordinator is a thin mapper between :class:`SocialHomeClient`
 errors and Home Assistant's update-coordinator exception contract.
@@ -14,7 +14,7 @@ from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import UpdateFailed
 from socialhome_client import SHAuthError, SHClientError, UnreadSummary
 
-from custom_components.social_home.coordinator import SocialHomeCoordinator
+from custom_components.socialhome.coordinator import SocialHomeCoordinator
 
 
 def _make_client(unread: AsyncMock) -> MagicMock:

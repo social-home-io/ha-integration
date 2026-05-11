@@ -35,7 +35,7 @@ tests/
 └── test_presence.py           state_changed → API + four GPS gates
 ```
 
-The tree mirrors `custom_components/social_home/`. A new module
+The tree mirrors `custom_components/socialhome/`. A new module
 needs its matching `tests/test_<module>.py`; new behaviour on an
 existing module gets at least one new `async def test_xxx()` in the
 matching file.
@@ -100,7 +100,7 @@ pip install -e .[dev]
 pytest                                       # full suite, gated at 85 %
 pytest -k presence                           # one module
 ruff check custom_components/ tests/
-mypy custom_components/social_home/
+mypy custom_components/socialhome/
 ```
 
 `pre-commit install` runs the same set on every commit.

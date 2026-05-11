@@ -9,7 +9,7 @@ on:
 #
 # 1. Enforce that ``manifest.json``'s ``version`` matches the
 #    release tag before the release goes live.
-# 2. Upload a zipped copy of ``custom_components/social_home/`` so
+# 2. Upload a zipped copy of ``custom_components/socialhome/`` so
 #    HACS shows the correct download size and users running fresh
 #    installs get a deterministic artifact.
 #
@@ -28,7 +28,7 @@ jobs:
         run: |
           set -euo pipefail
           tag="${GITHUB_REF_NAME}"
-          manifest_version=$(python -c "import json; print(json.load(open('custom_components/social_home/manifest.json'))['version'])")
+          manifest_version=$(python -c "import json; print(json.load(open('custom_components/socialhome/manifest.json'))['version'])")
           if [[ "$tag" != "$manifest_version" ]]; then
             echo "::error ::manifest.json version ($manifest_version) does not match release tag ($tag)"
             exit 1
@@ -36,10 +36,10 @@ jobs:
 
       - name: Zip the integration folder
         run: |
-          cd custom_components/social_home
-          zip -r "$GITHUB_WORKSPACE/social_home.zip" .
+          cd custom_components/socialhome
+          zip -r "$GITHUB_WORKSPACE/socialhome.zip" .
 
       - name: Attach the zip to the release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "$GITHUB_REF_NAME" social_home.zip --clobber
+        run: gh release upload "$GITHUB_REF_NAME" socialhome.zip --clobber

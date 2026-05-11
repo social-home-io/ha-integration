@@ -7,7 +7,7 @@ AI agent instruction file. Read before editing. Canonical spec:
 - Python 3.14 floor — HA Core's own floor is 3.14.2 (2026.3+).
 - CalVer release tags (e.g. ``2026.4.25``); ``manifest.json``'s
   ``version`` must match the release tag.
-- Never import from `social_home` (core). Runtime deps: `homeassistant`
+- Never import from `socialhome` (core). Runtime deps: `homeassistant`
   and `socialhome-client>=1.0.0`.
 - All I/O is async; no `time.sleep`, no blocking calls.
 - All imports at the top of the file; only `if TYPE_CHECKING:`
@@ -48,6 +48,6 @@ commit:
   and from the repo-root `README.md`.
 
 ### File locations
-- Integration code: `custom_components/social_home/`
+- Integration code: `custom_components/socialhome/`
 - Tests: `tests/` (mirrors the module tree)
 - Docs: `docs/` (principles, architecture, testing)

@@ -18,7 +18,7 @@ three always-on bridges that don't surface as entities:
   ``POST /api/presence/location``. Gated on the ``sync_location``
   option so users can opt out without removing the integration.
 * federation inbox relay (spec §7.10) — public HA HTTP view at
-  ``/api/social_home/inbox/{inbox_id}`` that proxies raw envelopes
+  ``/api/socialhome/inbox/{inbox_id}`` that proxies raw envelopes
   from remote Social Home instances into the add-on's internal
   ``/federation/inbox/{inbox_id}``.
 

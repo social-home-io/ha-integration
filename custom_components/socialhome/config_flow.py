@@ -117,12 +117,12 @@ class SocialHomeConfigFlow(ConfigFlow, domain=DOMAIN):
         would just create a flow that breaks at ``_validate``
         without a useful error.
         """
-        host = str(discovery_info.config.get("host") or "")
+        host = discovery_info.config.get("host")
         port = discovery_info.config.get("port")
-        token = str(discovery_info.config.get("token") or "")
+        token = discovery_info.config.get("token")
         if not host or not port or not token:
             return self.async_abort(reason="cannot_connect")
-        url = f"http://{host}:{int(port)}"
+        url = f"http://{host}:{port}"
 
         try:
             identity = await _validate(url, token)

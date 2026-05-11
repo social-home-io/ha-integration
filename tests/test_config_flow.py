@@ -23,8 +23,6 @@ from custom_components.socialhome.const import (
     CONF_USERNAME,
     DOMAIN,
     OPT_SYNC_LOCATION,
-    OPT_SYNC_SHOPPING,
-    OPT_SYNC_SPACE_CALENDARS,
 )
 
 
@@ -313,10 +311,9 @@ async def test_reauth_flow_connection_error(
 # ── Options flow ──────────────────────────────────────────────────────────
 
 
-async def test_options_flow_saves_toggles(
+async def test_options_flow_saves_toggle(
     hass: HomeAssistant,
     mock_client: MagicMock,
-    mock_ws_manager: MagicMock,
     config_entry: MockConfigEntry,
 ) -> None:
     config_entry.add_to_hass(hass)
@@ -330,13 +327,7 @@ async def test_options_flow_saves_toggles(
 
     result = await hass.config_entries.options.async_configure(
         result["flow_id"],
-        {
-            OPT_SYNC_LOCATION: False,
-            OPT_SYNC_SHOPPING: True,
-            OPT_SYNC_SPACE_CALENDARS: True,
-        },
+        {OPT_SYNC_LOCATION: False},
     )
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    # Options are persisted on the entry.
     assert config_entry.options[OPT_SYNC_LOCATION] is False
-    assert config_entry.options[OPT_SYNC_SPACE_CALENDARS] is True

@@ -1,8 +1,8 @@
 """Social Home HA custom integration — setup + unload.
 
 Spec §7.10. No entity platforms yet (see :data:`PLATFORMS` —
-empty list); this module owns the per-entry shared objects plus
-three always-on bridges that don't surface as entities:
+empty list); this module owns the per-entry shared client plus
+the always-on bridges that don't surface as entities:
 
 * federation base URL push (spec §7.10) — the HA integration is
   the only party that knows the instance's externally-reachable
@@ -23,7 +23,9 @@ three always-on bridges that don't surface as entities:
   ``/federation/inbox/{inbox_id}``.
 
 Entity platforms (sensor / calendar / notify / shopping / …) land
-one at a time in follow-up work.
+one at a time in follow-up work; the polling coordinator + WS
+manager will come back with the first platform that actually
+needs them.
 """
 
 from __future__ import annotations
@@ -33,10 +35,9 @@ from dataclasses import dataclass
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
-from socialhome_client import SocialHomeClient
+from socialhome_client import SHAuthError, SHClientError, SocialHomeClient
 
 from .const import CONF_TOKEN, CONF_URL, DEFAULT_SYNC_LOCATION, OPT_SYNC_LOCATION, PLATFORMS
-from .coordinator import SocialHomeCoordinator
 from .federation import (
     async_push_federation_base,
     async_register_federation_listener,
@@ -51,15 +52,11 @@ from .presence import async_setup_presence
 
 @dataclass(slots=True)
 class SocialHomeRuntimeData:
-    """Per-entry objects shared across platforms.
-
-    Stored on :attr:`ConfigEntry.runtime_data` (HA ≥ 2024.10). Owns
-    its members' lifecycle — :func:`async_unload_entry` closes the
-    client and stops the WS manager when the entry unloads.
-    """
+    """Per-entry shared client. Stored on
+    :attr:`ConfigEntry.runtime_data` (HA ≥ 2024.10) and torn down
+    by :func:`async_unload_entry`."""
 
     client: SocialHomeClient
-    coordinator: SocialHomeCoordinator
 
 
 type SocialHomeConfigEntry = ConfigEntry[SocialHomeRuntimeData]
@@ -68,25 +65,29 @@ type SocialHomeConfigEntry = ConfigEntry[SocialHomeRuntimeData]
 async def async_setup_entry(hass: HomeAssistant, entry: SocialHomeConfigEntry) -> bool:
     """Initialise one Social Home config entry.
 
-    Builds the shared client + coordinator, performs the first
-    refresh (so HA surfaces auth / connectivity problems up front),
-    and stashes both on ``entry.runtime_data``.
+    Builds the shared client, round-trips ``GET /api/me`` once as a
+    setup-time canary (so HA surfaces a bad token or unreachable
+    server up front instead of silently failing the first bridge
+    call), and stashes the client on ``entry.runtime_data``.
     """
     client = SocialHomeClient(entry.data[CONF_URL], entry.data[CONF_TOKEN])
-    coordinator = SocialHomeCoordinator(hass, client)
 
-    # First refresh drives the coordinator's own error mapping:
-    # ``SHAuthError`` → ``ConfigEntryAuthFailed`` (re-auth flow),
-    # ``SHClientError`` → ``UpdateFailed`` which HA surfaces as
-    # ``ConfigEntryNotReady``. We close the client on any failure so
-    # a retry gets a clean session.
+    # Setup canary: same call the config flow already proved works
+    # on add-integration. Mapping errors to the HA-standard
+    # exceptions gets us the re-auth flow (``SHAuthError`` → 401)
+    # and the automatic retry (``SHClientError`` → transport) for
+    # free. Close the session on any failure so a retry gets a
+    # clean one.
     try:
-        await coordinator.async_config_entry_first_refresh()
-    except (ConfigEntryAuthFailed, ConfigEntryNotReady):
+        await client.me.get()
+    except SHAuthError as err:
         await client.close()
-        raise
+        raise ConfigEntryAuthFailed("Social Home token rejected") from err
+    except SHClientError as err:
+        await client.close()
+        raise ConfigEntryNotReady(f"Social Home unreachable: {err}") from err
 
-    entry.runtime_data = SocialHomeRuntimeData(client=client, coordinator=coordinator)
+    entry.runtime_data = SocialHomeRuntimeData(client=client)
 
     # Federation base URL push — best-effort, never blocks setup.
     # The helper swallows its own ``SHClientError``s; the listener
@@ -127,9 +128,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: SocialHomeConfigEntry) 
     """
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unloaded:
-        runtime = entry.runtime_data
-        await runtime.coordinator.ws_manager.disconnect()
-        await runtime.client.close()
+        await entry.runtime_data.client.close()
     return unloaded
 
 

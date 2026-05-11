@@ -19,7 +19,6 @@ async def _setup(
     hass: HomeAssistant,
     config_entry: MockConfigEntry,
     mock_client: MagicMock,
-    mock_ws_manager: MagicMock,
 ) -> None:
     config_entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(config_entry.entry_id)
@@ -30,7 +29,6 @@ async def test_inbox_post_mirrors_addon_response(
     hass: HomeAssistant,
     config_entry: MockConfigEntry,
     mock_client: MagicMock,
-    mock_ws_manager: MagicMock,
     hass_client_no_auth: ClientSessionGenerator,
 ) -> None:
     """Happy path: raw body forwarded; status + body + content-type echoed."""
@@ -39,7 +37,7 @@ async def test_inbox_post_mirrors_addon_response(
             status=200, body=b'{"status":"ok"}', content_type="application/json"
         )
     )
-    await _setup(hass, config_entry, mock_client, mock_ws_manager)
+    await _setup(hass, config_entry, mock_client)
     client = await hass_client_no_auth()
 
     resp = await client.post(
@@ -65,13 +63,12 @@ async def test_inbox_post_passes_signature_header(
     hass: HomeAssistant,
     config_entry: MockConfigEntry,
     mock_client: MagicMock,
-    mock_ws_manager: MagicMock,
     hass_client_no_auth: ClientSessionGenerator,
 ) -> None:
     mock_client.return_value.federation.forward_inbox_envelope = AsyncMock(
         return_value=FederationRelayResult(status=200, body=b"", content_type="")
     )
-    await _setup(hass, config_entry, mock_client, mock_ws_manager)
+    await _setup(hass, config_entry, mock_client)
     client = await hass_client_no_auth()
 
     await client.post(
@@ -88,7 +85,6 @@ async def test_inbox_post_non_2xx_is_passed_through(
     hass: HomeAssistant,
     config_entry: MockConfigEntry,
     mock_client: MagicMock,
-    mock_ws_manager: MagicMock,
     hass_client_no_auth: ClientSessionGenerator,
 ) -> None:
     """410 from the add-on (replay / expired) surfaces as 410 to the peer."""
@@ -99,7 +95,7 @@ async def test_inbox_post_non_2xx_is_passed_through(
             content_type="application/json",
         )
     )
-    await _setup(hass, config_entry, mock_client, mock_ws_manager)
+    await _setup(hass, config_entry, mock_client)
     client = await hass_client_no_auth()
 
     resp = await client.post("/api/socialhome/inbox/wh-peer", data=b"{}")
@@ -112,7 +108,6 @@ async def test_inbox_post_forwards_large_body_to_addon(
     hass: HomeAssistant,
     config_entry: MockConfigEntry,
     mock_client: MagicMock,
-    mock_ws_manager: MagicMock,
     hass_client_no_auth: ClientSessionGenerator,
 ) -> None:
     """The inbox doubles as a WebRTC fallback for chunked media — no local cap.
@@ -129,7 +124,7 @@ async def test_inbox_post_forwards_large_body_to_addon(
         return FederationRelayResult(status=200, body=b"", content_type="")
 
     mock_client.return_value.federation.forward_inbox_envelope = AsyncMock(side_effect=_record)
-    await _setup(hass, config_entry, mock_client, mock_ws_manager)
+    await _setup(hass, config_entry, mock_client)
     client = await hass_client_no_auth()
 
     # 2 MiB — comfortably above the spec's old envelope-only cap,
@@ -146,13 +141,12 @@ async def test_inbox_post_maps_client_error_to_bad_gateway(
     hass: HomeAssistant,
     config_entry: MockConfigEntry,
     mock_client: MagicMock,
-    mock_ws_manager: MagicMock,
     hass_client_no_auth: ClientSessionGenerator,
 ) -> None:
     mock_client.return_value.federation.forward_inbox_envelope = AsyncMock(
         side_effect=SHClientError("dns failure")
     )
-    await _setup(hass, config_entry, mock_client, mock_ws_manager)
+    await _setup(hass, config_entry, mock_client)
     client = await hass_client_no_auth()
 
     resp = await client.post("/api/socialhome/inbox/wh-peer", data=b"{}")
@@ -163,14 +157,13 @@ async def test_inbox_view_requires_no_auth(
     hass: HomeAssistant,
     config_entry: MockConfigEntry,
     mock_client: MagicMock,
-    mock_ws_manager: MagicMock,
     hass_client_no_auth: ClientSessionGenerator,
 ) -> None:
     """Signed envelope is the auth; the HA endpoint must not require a bearer."""
     mock_client.return_value.federation.forward_inbox_envelope = AsyncMock(
         return_value=FederationRelayResult(status=200, body=b"", content_type="")
     )
-    await _setup(hass, config_entry, mock_client, mock_ws_manager)
+    await _setup(hass, config_entry, mock_client)
     # ``hass_client_no_auth`` has no Authorization header. A 401
     # would mean the view was wired with ``requires_auth`` left on
     # its default. Expect 200.
@@ -183,7 +176,6 @@ async def test_inbox_view_registered_once_across_reloads(
     hass: HomeAssistant,
     config_entry: MockConfigEntry,
     mock_client: MagicMock,
-    mock_ws_manager: MagicMock,
 ) -> None:
     """Reloading the entry must not raise on duplicate URL registration."""
     config_entry.add_to_hass(hass)

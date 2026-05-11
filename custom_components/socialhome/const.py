@@ -35,23 +35,11 @@ CONF_USERNAME: Final = "username"
 
 # ── ConfigEntry.options keys ────────────────────────────────────────────
 #
-# Options drive what the integration syncs. The skeleton declares
-# the keys so the options flow + future platform modules agree on
-# spelling; platform code reads them on setup.
+# Only the option actually wired today: the presence forwarder.
+# Future syncs (calendar, shopping, …) will land their own keys
+# alongside the platform that reads them — pinning unused keys
+# here invites silent rot and ships a Settings dialog full of
+# toggles that don't do anything.
 
 OPT_SYNC_LOCATION: Final = "sync_location"
-OPT_SYNC_CALENDAR: Final = "sync_calendar"
-OPT_SYNC_SPACE_CALENDARS: Final = "sync_space_calendars"
-OPT_SYNC_SHOPPING: Final = "sync_shopping"
-
 DEFAULT_SYNC_LOCATION: Final = True
-DEFAULT_SYNC_CALENDAR: Final = True
-DEFAULT_SYNC_SPACE_CALENDARS: Final = False
-DEFAULT_SYNC_SHOPPING: Final = True
-
-# ── Coordinator tuning ──────────────────────────────────────────────────
-
-#: How often the shared coordinator polls
-#: ``GET /api/me/unread-summary``. Spec §6.2a. WS events can trigger
-#: an immediate refresh between polls.
-UPDATE_INTERVAL_SECONDS: Final = 60

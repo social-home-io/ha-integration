@@ -19,7 +19,6 @@ from socialhome_client import (
     FederationBaseUpdate,
     IceServer,
     IceServersUpdate,
-    UnreadSummary,
     User,
 )
 
@@ -66,11 +65,6 @@ def sample_user() -> User:
 
 
 @pytest.fixture
-def sample_unread() -> UnreadSummary:
-    return UnreadSummary(total=3, feed=1, dms=1, spaces={"sp-1": 1})
-
-
-@pytest.fixture
 def config_entry() -> MockConfigEntry:
     """A fully-populated mock config entry for Social Home."""
     return MockConfigEntry(
@@ -87,7 +81,7 @@ def config_entry() -> MockConfigEntry:
 
 
 @pytest.fixture
-def mock_client(sample_user: User, sample_unread: UnreadSummary) -> Iterator[MagicMock]:
+def mock_client(sample_user: User) -> Iterator[MagicMock]:
     """Patch :class:`SocialHomeClient` across the integration.
 
     Both ``config_flow`` and ``__init__`` import the client by name,
@@ -97,7 +91,6 @@ def mock_client(sample_user: User, sample_unread: UnreadSummary) -> Iterator[Mag
     instance = MagicMock()
     instance.me = MagicMock()
     instance.me.get = AsyncMock(return_value=sample_user)
-    instance.me.unread_summary = AsyncMock(return_value=sample_unread)
 
     # Presence bridge pushes through ``presence.post_location``; give
     # it an awaitable so tests that fire a ``state_changed`` can
@@ -142,20 +135,4 @@ def mock_client(sample_user: User, sample_unread: UnreadSummary) -> Iterator[Mag
     ):
         # Expose the factory so tests can assert call args; the
         # instance is reachable via ``mock_client.return_value``.
-        yield factory
-
-
-@pytest.fixture
-def mock_ws_manager() -> Iterator[MagicMock]:
-    """Patch :class:`SocialHomeWsManager` to avoid real WS I/O.
-
-    The coordinator instantiates one on construction; the fake
-    no-ops ``connect`` / ``disconnect``.
-    """
-    instance = MagicMock()
-    instance.connect = AsyncMock()
-    instance.disconnect = AsyncMock()
-    instance.register = MagicMock(return_value=lambda: None)
-    factory = MagicMock(return_value=instance)
-    with patch("custom_components.socialhome.coordinator.SocialHomeWsManager", factory):
         yield factory

@@ -33,15 +33,9 @@ from .const import (
     CONF_URL,
     CONF_USER_ID,
     CONF_USERNAME,
-    DEFAULT_SYNC_CALENDAR,
     DEFAULT_SYNC_LOCATION,
-    DEFAULT_SYNC_SHOPPING,
-    DEFAULT_SYNC_SPACE_CALENDARS,
     DOMAIN,
-    OPT_SYNC_CALENDAR,
     OPT_SYNC_LOCATION,
-    OPT_SYNC_SHOPPING,
-    OPT_SYNC_SPACE_CALENDARS,
 )
 
 #: User flow schema — URL + token, both required. ``vol.Url`` only
@@ -196,12 +190,9 @@ class SocialHomeConfigFlow(ConfigFlow, domain=DOMAIN):
 
 
 class SocialHomeOptionsFlow(OptionsFlow):
-    """Lets the user toggle what the integration syncs.
-
-    The skeleton defines the keys and defaults even though no
-    platform reads them yet — pinning the schema now means
-    user-saved options survive future platform additions.
-    """
+    """Toggle integration features. Today only ``sync_location``
+    (the presence forwarder); future entity platforms will land
+    their own keys alongside the code that reads them."""
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         if user_input is not None:
@@ -213,18 +204,6 @@ class SocialHomeOptionsFlow(OptionsFlow):
                 vol.Optional(
                     OPT_SYNC_LOCATION,
                     default=current.get(OPT_SYNC_LOCATION, DEFAULT_SYNC_LOCATION),
-                ): bool,
-                vol.Optional(
-                    OPT_SYNC_CALENDAR,
-                    default=current.get(OPT_SYNC_CALENDAR, DEFAULT_SYNC_CALENDAR),
-                ): bool,
-                vol.Optional(
-                    OPT_SYNC_SPACE_CALENDARS,
-                    default=current.get(OPT_SYNC_SPACE_CALENDARS, DEFAULT_SYNC_SPACE_CALENDARS),
-                ): bool,
-                vol.Optional(
-                    OPT_SYNC_SHOPPING,
-                    default=current.get(OPT_SYNC_SHOPPING, DEFAULT_SYNC_SHOPPING),
                 ): bool,
             }
         )

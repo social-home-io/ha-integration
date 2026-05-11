@@ -22,9 +22,8 @@ async def test_setup_entry_success(
     hass: HomeAssistant,
     config_entry: MockConfigEntry,
     mock_client: MagicMock,
-    mock_ws_manager: MagicMock,
 ) -> None:
-    """Happy path: client + coordinator built, entry LOADED, no platforms."""
+    """Happy path: client built, ``GET /api/me`` canary fires, entry LOADED."""
     config_entry.add_to_hass(hass)
 
     assert await hass.config_entries.async_setup(config_entry.entry_id)
@@ -34,18 +33,17 @@ async def test_setup_entry_success(
     mock_client.assert_called_once_with("http://sh.test", "token-abc")
     runtime = config_entry.runtime_data
     assert isinstance(runtime, SocialHomeRuntimeData)
-    # First refresh was issued — exactly one unread_summary round-trip.
-    assert runtime.client.me.unread_summary.await_count == 1
+    # Setup canary issued exactly one ``GET /api/me``.
+    assert runtime.client.me.get.await_count == 1
 
 
 async def test_setup_entry_auth_failure_triggers_reauth(
     hass: HomeAssistant,
     config_entry: MockConfigEntry,
     mock_client: MagicMock,
-    mock_ws_manager: MagicMock,
 ) -> None:
-    """A 401 on first refresh maps to ``SETUP_ERROR`` + re-auth flow."""
-    mock_client.return_value.me.unread_summary = AsyncMock(side_effect=SHAuthError())
+    """A 401 on the setup canary maps to ``SETUP_ERROR`` + re-auth flow."""
+    mock_client.return_value.me.get = AsyncMock(side_effect=SHAuthError())
     config_entry.add_to_hass(hass)
 
     assert not await hass.config_entries.async_setup(config_entry.entry_id)
@@ -63,10 +61,9 @@ async def test_setup_entry_transport_error_is_retry(
     hass: HomeAssistant,
     config_entry: MockConfigEntry,
     mock_client: MagicMock,
-    mock_ws_manager: MagicMock,
 ) -> None:
     """Transport errors map to ``SETUP_RETRY`` (HA will retry later)."""
-    mock_client.return_value.me.unread_summary = AsyncMock(side_effect=SHClientError("boom"))
+    mock_client.return_value.me.get = AsyncMock(side_effect=SHClientError("boom"))
     config_entry.add_to_hass(hass)
 
     assert not await hass.config_entries.async_setup(config_entry.entry_id)
@@ -76,13 +73,12 @@ async def test_setup_entry_transport_error_is_retry(
     mock_client.return_value.close.assert_awaited()
 
 
-async def test_unload_entry_closes_client_and_ws(
+async def test_unload_entry_closes_client(
     hass: HomeAssistant,
     config_entry: MockConfigEntry,
     mock_client: MagicMock,
-    mock_ws_manager: MagicMock,
 ) -> None:
-    """Unload disconnects WS and closes the HTTP session."""
+    """Unload closes the shared HTTP session."""
     config_entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(config_entry.entry_id)
     await hass.async_block_till_done()
@@ -91,7 +87,6 @@ async def test_unload_entry_closes_client_and_ws(
     await hass.async_block_till_done()
 
     assert config_entry.state is ConfigEntryState.NOT_LOADED
-    mock_ws_manager.return_value.disconnect.assert_awaited_once()
     mock_client.return_value.close.assert_awaited()
 
 
@@ -99,7 +94,6 @@ async def test_options_update_reloads_entry(
     hass: HomeAssistant,
     config_entry: MockConfigEntry,
     mock_client: MagicMock,
-    mock_ws_manager: MagicMock,
 ) -> None:
     """Saving new options reloads the entry so platforms re-read them."""
     config_entry.add_to_hass(hass)
@@ -119,7 +113,6 @@ async def test_config_entry_url_and_token_wired(
     hass: HomeAssistant,
     config_entry: MockConfigEntry,
     mock_client: MagicMock,
-    mock_ws_manager: MagicMock,
 ) -> None:
     """Regression: URL + token stored on the entry flow through to the client."""
     config_entry.add_to_hass(hass)
@@ -133,7 +126,6 @@ async def test_setup_attaches_presence_listener_when_option_on(
     hass: HomeAssistant,
     config_entry: MockConfigEntry,
     mock_client: MagicMock,
-    mock_ws_manager: MagicMock,
 ) -> None:
     """Default options include ``sync_location=True`` → presence listener fires."""
     config_entry.add_to_hass(hass)
@@ -157,7 +149,6 @@ async def test_setup_skips_presence_listener_when_option_off(
     hass: HomeAssistant,
     config_entry: MockConfigEntry,
     mock_client: MagicMock,
-    mock_ws_manager: MagicMock,
 ) -> None:
     """``sync_location=False`` → no presence listener, no push fires."""
     config_entry.add_to_hass(hass)

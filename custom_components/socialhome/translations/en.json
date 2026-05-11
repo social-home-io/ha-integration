@@ -37,10 +37,7 @@
         "title": "Social Home options",
         "description": "Choose what the integration syncs between Home Assistant and Social Home.",
         "data": {
-          "sync_location": "Sync person location to Social Home",
-          "sync_calendar": "Sync personal calendars",
-          "sync_space_calendars": "Also sync space calendars",
-          "sync_shopping": "Sync shopping list"
+          "sync_location": "Sync person location to Social Home"
         }
       }
     }

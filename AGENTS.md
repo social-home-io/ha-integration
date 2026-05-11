@@ -12,10 +12,17 @@ AI agent instruction file. Read before editing. Canonical spec:
 - All I/O is async; no `time.sleep`, no blocking calls.
 - All imports at the top of the file; only `if TYPE_CHECKING:`
   exceptions.
-- `ConfigEntry.runtime_data` owns the shared `SocialHomeClient` +
-  `SocialHomeCoordinator`. `async_unload_entry` must close both.
-- Coordinator maps `SHAuthError` → `ConfigEntryAuthFailed`, any other
-  `SHClientError` → `UpdateFailed`. No other exception types escape.
+- `ConfigEntry.runtime_data` owns the shared `SocialHomeClient`.
+  `async_unload_entry` closes it. A polling coordinator joins the
+  moment a platform actually needs polled data — don't ship one
+  as a placeholder.
+- Setup canary: `client.me.get()`. `SHAuthError` →
+  `ConfigEntryAuthFailed` (re-auth flow). Any other `SHClientError`
+  → `ConfigEntryNotReady` (HA retries). Same mapping for any
+  coordinator that gets added later, with `UpdateFailed` instead
+  of `ConfigEntryNotReady`.
+- Don't ship dead code — options, coordinators, cached resources
+  land with the platform / bridge that reads them.
 - Never log, expose, or surface the bearer token.
 
 ### Testing
@@ -29,9 +36,10 @@ commit:
 - New entity platform (`sensor.py`, `calendar.py`, `notify.py`,
   `shopping_list.py`) → update the lifecycle diagram + "Where
   things live" table in `docs/architecture.md`.
-- Changed coordinator (different polled endpoint, new interval,
-  additional exception mapping) → coordinator section + exception
-  table in `docs/architecture.md`.
+- Reintroduced a polling coordinator (entity platform that needs
+  polled data) → bring back a coordinator section in
+  `docs/architecture.md` with the polled endpoint, interval, and
+  exception mapping.
 - Changed the config flow or its options → update both the
   strings/translations files AND the config-flow table in
   `docs/architecture.md`.

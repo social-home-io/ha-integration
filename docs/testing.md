@@ -25,10 +25,9 @@ existing `tests/` tree.
 
 ```
 tests/
-├── conftest.py                shared fixtures: mock_client, mock_ws_manager,
-│                              config_entry, sample_user, sample_unread
+├── conftest.py                shared fixtures: mock_client, config_entry,
+│                              sample_user
 ├── test_config_flow.py        user / Hassio / reauth / options
-├── test_coordinator.py        success + error mapping + interval
 ├── test_federation.py         base URL push + listener + config updates
 ├── test_federation_inbox.py   POST handling + error codes + multi-account
 ├── test_init.py               entry setup / unload / platform forwarding
@@ -46,9 +45,7 @@ matching file.
 |---|---|
 | `config_entry` | A fake `ConfigEntry` with realistic data + entry_id |
 | `sample_user` | A `User` dataclass with sensible defaults |
-| `sample_unread` | An `UnreadSummary` dataclass |
 | `mock_client` | An `AsyncMock` patched into both import sites — the test exercises code paths without ever talking to a real HFS |
-| `mock_ws_manager` | An `AsyncMock` for `SocialHomeWsManager`, with `register` / `connect` / `close` stubbed |
 
 `mock_client` patches the import name in **both** `__init__.py` and
 `config_flow.py` — they import `SocialHomeClient` separately, and
@@ -56,19 +53,26 @@ patching only one leaves a real client wired into the other.
 
 ## Patterns
 
-### Coordinator error mapping
+### Setup-canary error mapping
+
+`async_setup_entry` runs a single `client.me.get()` so a bad token
+or unreachable server fails setup loudly. `test_init.py` covers
+both branches by sideways-injecting the failure on the mocked
+client:
 
 ```python
-async def test_coordinator_maps_auth_error(mock_client, hass, config_entry):
-    mock_client.me.unread_summary.side_effect = SHAuthError("expired", status=401)
-    coord = SocialHomeCoordinator(hass, mock_client)
+async def test_setup_entry_auth_failure_triggers_reauth(
+    hass, config_entry, mock_client,
+):
+    mock_client.return_value.me.get = AsyncMock(side_effect=SHAuthError())
+    config_entry.add_to_hass(hass)
 
-    with pytest.raises(ConfigEntryAuthFailed):
-        await coord._async_update_data()
+    assert not await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+    assert config_entry.state is ConfigEntryState.SETUP_ERROR
 ```
 
-One test per exception type. The same shape exercises
-`SHClientError → UpdateFailed`.
+Same shape exercises `SHClientError → SETUP_RETRY`.
 
 ### Presence gates
 

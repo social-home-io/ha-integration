@@ -10,7 +10,7 @@ the Social Home meta-repo.
 
 The integration is a thin bridge — the heavy lifting lives in
 `socialhome-client` (HTTP + WS). Keep this repo focused on HA glue:
-config flow, coordinator, entity platforms.
+config flow, bridges, entity platforms.
 
 ## Hard rules
 
@@ -38,13 +38,19 @@ config flow, coordinator, entity platforms.
   `ConfigEntry.data` and travels as `Authorization: Bearer …`.
   Don't log it; don't surface it in events, attributes, or error
   messages.
-- **`ConfigEntry.runtime_data` is the only shared state.** Put the
-  `SocialHomeClient` and `SocialHomeCoordinator` there; unload
-  tears both down cleanly.
+- **`ConfigEntry.runtime_data` is the only shared state.** It holds
+  the `SocialHomeClient`; unload closes it. A polling
+  `DataUpdateCoordinator` will join it the moment a platform
+  actually needs polled data — don't ship one as a placeholder.
 - **Raise `ConfigEntryAuthFailed` on 401 (`SHAuthError`).** HA then
   routes the user through the re-auth flow.
-- **Raise `UpdateFailed` on transient errors (`SHClientError`).**
-  Never let arbitrary exceptions escape coordinator updates.
+- **Raise `ConfigEntryNotReady` (in setup) / `UpdateFailed` (in a
+  coordinator) on transient errors (`SHClientError`).** Never let
+  arbitrary exceptions escape setup or a coordinator update.
+- **Don't ship dead code.** Options toggles, coordinators, and
+  cached resources land alongside the platform / bridge that
+  reads them — not as forward-compat scaffolding. Future-you can
+  add a key when future-you actually needs it.
 
 ## Layout
 
@@ -53,16 +59,21 @@ custom_components/socialhome/
   manifest.json         # HACS manifest — domain, version, requirements
   __init__.py           # async_setup_entry / async_unload_entry
   const.py              # DOMAIN, platform list, option keys, defaults
-  coordinator.py        # SocialHomeCoordinator (polls unread-summary)
   config_flow.py        # user + hassio + reauth + options flows
+  federation.py         # federation base URL push + listener
+  federation_inbox.py   # /api/socialhome/inbox/{inbox_id} HTTP view
+  ice_servers.py        # STUN/TURN ICE-server push + listener
+  presence.py           # person.* → POST /api/presence/location
   strings.json          # HA UI strings (source of truth)
   translations/en.json  # en mirror of strings.json
 tests/                  # pytest tree mirroring the module tree
 ```
 
 Entity platforms (`sensor.py`, `calendar.py`, `notify.py`,
-`shopping_list.py`, `presence.py`) are intentionally absent in the
-initial skeleton — the spec drops them in per-platform.
+`shopping_list.py`) are intentionally absent in the initial
+skeleton — the spec drops them in per-platform, and each platform
+brings back the polling coordinator (+ matching options keys) it
+needs.
 
 ## Testing
 
@@ -89,9 +100,10 @@ the matching doc file as part of the same change:
   diagram and the "Where things live" table in
   `docs/architecture.md`. Drop the platform name into `PLATFORMS`
   in `const.py` AND mention it in `docs/architecture.md`.
-- **Changed the coordinator** (different polled endpoint, new
-  interval, additional exception mapping)? Update the coordinator
-  section + exception-mapping table in `docs/architecture.md`.
+- **Reintroduced a polling coordinator** (added an entity
+  platform that needs polled data)? Bring back a
+  `coordinator.py` section in `docs/architecture.md` with the
+  polled endpoint, interval, and exception mapping.
 - **Changed the config flow or its options** (new flow, new option
   toggle, validation tweak)? Update both the strings/translations
   files AND the config-flow table in `docs/architecture.md`.
@@ -109,7 +121,7 @@ the matching doc file as part of the same change:
 - **Added a new top-level doc file under `docs/`?** Link it from
   `docs/README.md` and from the repo-root `README.md`.
 
-Reviewer checklist: if a PR adds a platform, changes the
+Reviewer checklist: if a PR adds a platform, reintroduces the
 coordinator, changes the config flow, changes a presence gate, or
 shifts the test strategy and the docs aren't touched, push back.
 Incremental accuracy beats big-bang rewrites.

@@ -4,10 +4,12 @@ How the integration fits together. Distilled from §7 of `spec_work.md`
 plus the current code under `custom_components/socialhome/`.
 
 The integration is a **skeleton with already-shipped bridges** — config
-flow, coordinator, federation base URL push, the federation inbox HTTP
-view, and the presence bridge are real implementations. Entity
-platforms (sensor, calendar, notify, shopping) land in follow-up PRs;
-the platforms list in `const.py` is intentionally empty for now.
+flow, federation base URL push, the federation inbox HTTP view, the
+STUN/TURN ICE-server push, and the presence bridge are real
+implementations. Entity platforms (sensor, calendar, notify, shopping)
+land in follow-up PRs; the platforms list in `const.py` is intentionally
+empty for now and the polling coordinator + WS manager will come back
+with the first platform that actually needs them.
 
 ## Module layout
 
@@ -16,7 +18,6 @@ custom_components/socialhome/
 ├── __init__.py            async_setup_entry / async_unload_entry
 ├── const.py               DOMAIN, platform list, option keys, defaults
 ├── config_flow.py         user + Hassio + reauth + options flows
-├── coordinator.py         SocialHomeCoordinator (polls /api/me/unread-summary)
 ├── federation.py          federation base URL push + listener
 ├── federation_inbox.py    /api/socialhome/inbox/{inbox_id} HTTP view
 ├── ice_servers.py         STUN/TURN ICE-server push + listener
@@ -37,16 +38,13 @@ sequenceDiagram
     participant entry as ConfigEntry
     participant init as async_setup_entry
     participant client as SocialHomeClient
-    participant coord as SocialHomeCoordinator
     participant pres as PresenceBridge
     participant view as FederationInboxView
 
     HA->>init: async_setup_entry(hass, entry)
     init->>client: SocialHomeClient(url, token)
-    init->>coord: SocialHomeCoordinator(hass, client)
-    init->>coord: async_config_entry_first_refresh()
-    coord->>client: c.me.unread_summary()
-    init->>entry: runtime_data = (client, coordinator)
+    init->>client: c.me.get()  // setup canary
+    init->>entry: runtime_data = SocialHomeRuntimeData(client)
     init->>view: register inbox view (once per HA process)
     init->>init: federation.push_base(client, hass.config.external_url)
     init->>init: ice_servers.push(client, web_rtc.async_get_ice_servers(hass))
@@ -54,17 +52,17 @@ sequenceDiagram
     HA->>init: ✓ ready
 ```
 
-`async_unload_entry` tears the same objects down — coordinator stop,
-client close, and presence-bridge unsubscribe. The federation inbox
-view is registered once per HA process and stays mounted; future
-entries reuse it.
+`async_unload_entry` closes the client and the federation-base /
+ICE-server listeners that `entry.async_on_unload`'d themselves
+during setup. The federation inbox view is registered once per HA
+process and stays mounted; future entries reuse it.
 
 ## Where state lives
 
-Exactly one place: `ConfigEntry.runtime_data`. It holds a tuple of
-`(SocialHomeClient, SocialHomeCoordinator)`. Everything else is
-either HA-owned (the `hass` object, the entry data) or stateless
-per-request (the inbox view, the federation push).
+Exactly one place: `ConfigEntry.runtime_data`. It holds a single
+`SocialHomeClient`. Everything else is either HA-owned (the `hass`
+object, the entry data) or stateless per-request (the inbox view,
+the federation push).
 
 No `hass.data[DOMAIN]` dict. No module-level globals. This is what
 makes unload safe: when HA tears the entry down, every reference is
@@ -80,35 +78,33 @@ Three flows are registered, all in `config_flow.py`:
 | **Hassio discovery** | App-mode auto-discovery | `host` + `port` + `token` from the add-on's discovery payload (`socialhome >= 2026.5.11` reads them from `GET /addons/self/info`); URL is `http://<host>:<port>` verbatim | Same `GET /api/me` round-trip |
 | **Reauth** | After `ConfigEntryAuthFailed` | Token only (URL locked) | Same |
 
-The options flow (re-entered any time) toggles four feature flags:
+The options flow today toggles a single feature flag:
 
 - `sync_location` — enable / disable the presence bridge.
-- `sync_calendar` — push HA calendars into Social Home.
-- `sync_space_calendars` — pull space calendars into HA as
-  read-only `calendar.*` entities (queued for the calendar PR).
-- `sync_shopping` — sync the HA shopping list with the household
-  shopping list.
 
-## Coordinator
+Future entity platforms will land their own option keys alongside
+the code that reads them — pinning unused toggles in the UI invites
+silent rot.
 
-`SocialHomeCoordinator` is a `DataUpdateCoordinator` that polls
-`GET /api/me/unread-summary` on a fixed interval (the default lives
-in `const.py`). It exists today as the data feed for entities that
-will land in follow-up PRs (sensor, notification badge, …).
+## Setup canary
 
-Exception mapping:
+`async_setup_entry` runs one `client.me.get()` round-trip before
+storing the client on `runtime_data`. Mapping its errors to the
+HA-standard exceptions wires the integration into HA's existing
+machinery for free:
 
 ```python
 try:
-    return await client.me.unread_summary()
+    await client.me.get()
 except SHAuthError as e:
-    raise ConfigEntryAuthFailed from e
+    raise ConfigEntryAuthFailed from e   # → re-auth flow
 except SHClientError as e:
-    raise UpdateFailed from e
+    raise ConfigEntryNotReady from e     # → automatic retry
 ```
 
-Nothing else escapes. New endpoints the coordinator polls go through
-the same mapping.
+The first entity platform that needs polled data will reintroduce
+a `DataUpdateCoordinator`; until then there's nothing to poll, so
+shipping one would just be dead code with its own failure surface.
 
 ## Federation base URL push (§7.10)
 
@@ -190,7 +186,6 @@ the entry.
 | Setup / unload entry | `custom_components/socialhome/__init__.py` |
 | Domain constants | `custom_components/socialhome/const.py` |
 | Config flow + options | `custom_components/socialhome/config_flow.py` |
-| Polling coordinator | `custom_components/socialhome/coordinator.py` |
 | Federation base URL | `custom_components/socialhome/federation.py` |
 | Federation inbox view | `custom_components/socialhome/federation_inbox.py` |
 | STUN/TURN ICE servers | `custom_components/socialhome/ice_servers.py` |
@@ -199,7 +194,9 @@ the entry.
 
 Future platform modules (`sensor.py`, `calendar.py`, `notify.py`,
 `shopping_list.py`) plug in by adding to `PLATFORMS` in `const.py`
-and forwarding from `__init__.py`.
+and forwarding from `__init__.py`. Whichever lands first
+reintroduces the polling coordinator + the matching options
+toggle.
 
 ## Spec references
 

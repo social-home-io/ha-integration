@@ -12,13 +12,12 @@ should be fixed.
   HA Core, CalVer releases, async everywhere, four GPS gates on the
   presence bridge.
 - **[architecture.md](./architecture.md)** — Module layout, setup /
-  unload sequence, config flow + options, coordinator error
+  unload sequence, config flow + options, setup-canary error
   mapping, federation base URL push, federation inbox view,
   presence bridge.
 - **[testing.md](./testing.md)** — 85 % branch-coverage gate,
-  shared fixtures (`mock_client`, `mock_ws_manager`, …),
-  patterns for testing the coordinator and presence gates, release
-  flow.
+  shared fixtures (`mock_client`, …), patterns for testing the
+  setup canary and presence gates, release flow.
 
 ## Where the spec lives
 

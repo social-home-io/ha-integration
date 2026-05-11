@@ -118,11 +118,19 @@ class SocialHomeConfigFlow(ConfigFlow, domain=DOMAIN):
         ``esphome``, ``motioneye``, and the official Hassio
         examples resolve the add-on hostname — the integration
         never trusts the add-on to send its own URL.
+
+        Note the slug → hostname transform: Docker DNS names can't
+        contain underscores, so the Supervisor publishes the
+        container under ``slug.replace("_", "-")`` (verified
+        against ``GET /addons/<slug>/info``'s ``hostname`` field —
+        e.g. ``local_social_home`` is reachable at
+        ``local-social-home``).
         """
         token = str(discovery_info.config.get("token") or "")
         if not token:
             return self.async_abort(reason="cannot_connect")
-        url = f"http://{discovery_info.slug}:{ADDON_HTTP_PORT}"
+        hostname = discovery_info.slug.replace("_", "-")
+        url = f"http://{hostname}:{ADDON_HTTP_PORT}"
 
         try:
             identity = await _validate(url, token)

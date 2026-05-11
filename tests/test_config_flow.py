@@ -31,14 +31,15 @@ from custom_components.socialhome.const import (
 def _hassio_info(
     *,
     token: str = "tok",
-    slug: str = "social_home",
+    slug: str = "local_social_home",
 ) -> HassioServiceInfo:
     """Build a hassio discovery payload.
 
     Matches the payload the add-on publishes:
     ``{"service": "socialhome", "config": {"token": …}}``. The URL
     is derived by the flow from ``slug`` (the Supervisor exposes
-    add-ons under their slug on the hassio Docker network), so
+    add-ons under ``slug.replace("_", "-")`` on the hassio Docker
+    network — Docker DNS labels can't contain underscores), so
     tests that want to assert the URL only need to vary the slug.
     """
     return HassioServiceInfo(
@@ -134,7 +135,7 @@ async def test_hassio_flow_creates_entry_from_payload(
     result = await hass.config_entries.flow.async_init(
         DOMAIN,
         context={"source": config_entries.SOURCE_HASSIO},
-        data=_hassio_info(token="tok", slug="social_home"),
+        data=_hassio_info(token="tok", slug="local_social_home"),
     )
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "hassio_confirm"
@@ -142,7 +143,9 @@ async def test_hassio_flow_creates_entry_from_payload(
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["data"] == {
-        CONF_URL: "http://social_home:8099",
+        # Docker DNS rewrites ``_`` to ``-`` so the URL is built
+        # from the slug with that substitution applied.
+        CONF_URL: "http://local-social-home:8099",
         CONF_TOKEN: "tok",
         CONF_USER_ID: "user-1",
         CONF_USERNAME: "pascal",
@@ -154,17 +157,19 @@ async def test_hassio_flow_derives_url_per_slug(
 ) -> None:
     """The early-access add-on (slug ``social_home_early``) lands on
     its own URL — proves the URL is derived from the slug, not
-    hard-coded."""
+    hard-coded. Also covers the underscore → dash transform that
+    Docker DNS requires (verified against the Supervisor's own
+    ``/addons/<slug>/info`` ``hostname`` field)."""
     result = await hass.config_entries.flow.async_init(
         DOMAIN,
         context={"source": config_entries.SOURCE_HASSIO},
-        data=_hassio_info(token="tok", slug="social_home_early"),
+        data=_hassio_info(token="tok", slug="local_social_home_early"),
     )
     assert result["type"] is FlowResultType.FORM
 
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert result["data"][CONF_URL] == "http://social_home_early:8099"
+    assert result["data"][CONF_URL] == "http://local-social-home-early:8099"
 
 
 async def test_hassio_flow_aborts_when_token_missing(hass: HomeAssistant) -> None:
@@ -208,11 +213,11 @@ async def test_hassio_flow_updates_existing_entry(
     result = await hass.config_entries.flow.async_init(
         DOMAIN,
         context={"source": config_entries.SOURCE_HASSIO},
-        data=_hassio_info(token="rotated", slug="social_home"),
+        data=_hassio_info(token="rotated", slug="local_social_home"),
     )
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "already_configured"
-    assert config_entry.data[CONF_URL] == "http://social_home:8099"
+    assert config_entry.data[CONF_URL] == "http://local-social-home:8099"
     assert config_entry.data[CONF_TOKEN] == "rotated"
 
 

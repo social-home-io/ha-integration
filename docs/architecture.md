@@ -77,7 +77,7 @@ Three flows are registered, all in `config_flow.py`:
 | Flow | When | Inputs | Validation |
 |---|---|---|---|
 | **User** | Standalone-mode setup | URL + API token | `GET /api/me` round-trip via `SocialHomeClient` |
-| **Hassio discovery** | App-mode auto-discovery | Token from Supervisor; URL derived from the discovery's add-on slug (`http://<slug>:8099`) | Same `GET /api/me` round-trip |
+| **Hassio discovery** | App-mode auto-discovery | Token from Supervisor; URL derived from the add-on slug with underscores rewritten to dashes (`http://<slug.replace("_", "-")>:8099`, matching the Supervisor's own `hostname` field — Docker DNS labels can't contain underscores) | Same `GET /api/me` round-trip |
 | **Reauth** | After `ConfigEntryAuthFailed` | Token only (URL locked) | Same |
 
 The options flow (re-entered any time) toggles four feature flags:

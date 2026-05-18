@@ -81,6 +81,58 @@ async def test_inbox_post_passes_signature_header(
     assert kwargs["extra_headers"] == {"X-SocialHome-Signature": "ed25:abc"}
 
 
+async def test_inbox_post_mirrors_content_type_with_charset(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+    mock_client: MagicMock,
+    hass_client_no_auth: ClientSessionGenerator,
+) -> None:
+    """The addon's ``web.json_response`` emits
+    ``application/json; charset=utf-8`` — aiohttp's ``content_type=``
+    ctor argument rejects any value with parameters, so this regression
+    test pins the relay to forward the realistic header via ``headers=``
+    without raising.
+    """
+    mock_client.return_value.federation.forward_inbox_envelope = AsyncMock(
+        return_value=FederationRelayResult(
+            status=200,
+            body=b'{"status":"ok"}',
+            content_type="application/json; charset=utf-8",
+        )
+    )
+    await _setup(hass, config_entry, mock_client)
+    client = await hass_client_no_auth()
+
+    resp = await client.post("/api/socialhome/inbox/wh-peer", data=b"{}")
+
+    assert resp.status == 200
+    assert resp.headers["Content-Type"] == "application/json; charset=utf-8"
+    assert await resp.read() == b'{"status":"ok"}'
+
+
+async def test_inbox_post_omits_content_type_when_empty(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+    mock_client: MagicMock,
+    hass_client_no_auth: ClientSessionGenerator,
+) -> None:
+    """An empty upstream ``content_type`` (addon returned no body)
+    must not echo back an empty ``Content-Type`` header."""
+    mock_client.return_value.federation.forward_inbox_envelope = AsyncMock(
+        return_value=FederationRelayResult(status=204, body=b"", content_type="")
+    )
+    await _setup(hass, config_entry, mock_client)
+    client = await hass_client_no_auth()
+
+    resp = await client.post("/api/socialhome/inbox/wh-peer", data=b"{}")
+
+    assert resp.status == 204
+    # aiohttp falls back to its own default (``application/octet-stream``)
+    # rather than echoing an empty header — what matters is that the
+    # relay doesn't raise and the body is empty.
+    assert await resp.read() == b""
+
+
 async def test_inbox_post_non_2xx_is_passed_through(
     hass: HomeAssistant,
     config_entry: MockConfigEntry,

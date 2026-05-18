@@ -102,10 +102,21 @@ class SocialHomeFederationInboxView(HomeAssistantView):
             _LOGGER.warning("Social Home: inbox relay for %s failed: %s", inbox_id, err)
             return web.json_response({"error": "bad_gateway"}, status=502)
 
+        # Forward the addon's Content-Type verbatim via ``headers``
+        # rather than the ``content_type=`` ctor arg — the latter
+        # rejects any value containing parameters (``charset=…``) and
+        # would raise ``ValueError: charset must not be in
+        # content_type argument`` for the ``application/json;
+        # charset=utf-8`` the addon emits from ``web.json_response``.
+        # Empty content_type (older addon responses with no body)
+        # falls through to aiohttp's default header.
+        headers: dict[str, str] = {}
+        if result.content_type:
+            headers["Content-Type"] = result.content_type
         return web.Response(
             body=result.body,
             status=result.status,
-            content_type=result.content_type,
+            headers=headers or None,
         )
 
 

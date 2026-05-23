@@ -17,8 +17,6 @@ import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from socialhome_client import (
     FederationBaseUpdate,
-    IceServer,
-    IceServersUpdate,
     User,
 )
 
@@ -113,14 +111,6 @@ def mock_client(sample_user: User) -> Iterator[MagicMock]:
         )
     )
     instance.ha.get_federation_base = AsyncMock(return_value=None)
-    instance.ha.set_ice_servers = AsyncMock(
-        return_value=IceServersUpdate(
-            ok=True,
-            ice_servers=(IceServer(urls=("stun:stun.home-assistant.io:3478",)),),
-            changed=False,
-        )
-    )
-    instance.ha.get_ice_servers = AsyncMock(return_value=[])
 
     instance.close = AsyncMock()
 

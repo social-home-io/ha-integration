@@ -8,11 +8,6 @@ the always-on bridges that don't surface as entities:
   the only party that knows the instance's externally-reachable
   URL, so we push it to the server on setup and whenever
   ``core_config_updated`` fires.
-* STUN/TURN ICE-server push (spec §7.10) — HA aggregates the
-  operator's STUN/TURN config (YAML + Nabu Casa Cloud + other
-  registered providers) via ``web_rtc.async_get_ice_servers``;
-  we forward it to the server so SH's WebRTC peers use the same
-  relays HA itself would use for cameras.
 * person location push (spec §7.3) — ``state_changed`` listener
   that forwards ``person.*`` updates to
   ``POST /api/presence/location``. Gated on the ``sync_location``
@@ -43,10 +38,6 @@ from .federation import (
     async_register_federation_listener,
 )
 from .federation_inbox import async_register_inbox_view
-from .ice_servers import (
-    async_push_ice_servers,
-    async_register_ice_servers_listener,
-)
 from .presence import async_setup_presence
 
 
@@ -95,12 +86,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: SocialHomeConfigEntry) -
     await async_push_federation_base(hass, client)
     async_register_federation_listener(hass, entry, client)
 
-    # STUN/TURN ICE-server push — same best-effort shape. The
-    # ``web_rtc`` integration is a hard dependency (see
-    # ``manifest.json``), so ``async_get_ice_servers`` always
-    # resolves; the listener re-pushes on ``core_config_updated``.
-    await async_push_ice_servers(hass, client)
-    async_register_ice_servers_listener(hass, entry, client)
+    # STUN/TURN ICE servers were previously pushed here on
+    # ``EVENT_CORE_CONFIG_UPDATE``. The Social Home backend now
+    # pulls ``web_rtc/ice_servers`` directly over the HA Core
+    # WebSocket at startup + daily — see
+    # ``socialhome/platform/ha/ice_servers_sync.py`` on the SH
+    # side. The push path was removed because the
+    # ``EVENT_CORE_CONFIG_UPDATE`` listener never fired for Nabu
+    # Casa Cloud's runtime TURN registration, leaving Cloud
+    # users with stale STUN-only ICE state.
 
     # Public inbox URL for inbound federation envelopes. The view
     # is stateless per request, looks up the live config entry on

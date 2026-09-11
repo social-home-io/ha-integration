@@ -30,6 +30,7 @@ from dataclasses import dataclass
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
+from homeassistant.helpers.typing import ConfigType
 from socialhome_client import SHAuthError, SHClientError, SocialHomeClient
 
 from .const import CONF_TOKEN, CONF_URL, DEFAULT_SYNC_LOCATION, OPT_SYNC_LOCATION, PLATFORMS
@@ -51,6 +52,35 @@ class SocialHomeRuntimeData:
 
 
 type SocialHomeConfigEntry = ConfigEntry[SocialHomeRuntimeData]
+
+
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Register the federation inbox route, once per HA process.
+
+    Home Assistant cannot *un*register an HTTP view, so a view belongs at
+    component setup rather than per config entry — the same pattern HA's
+    own ``mobile_app`` uses for its registration view. Doing it here also
+    decouples the route's existence from whether an entry managed to
+    load, which matters more than the tidiness:
+
+    Federation peers POST envelopes to
+    ``/api/socialhome/inbox/{inbox_id}``. While registration happened at
+    the *end* of ``async_setup_entry``, anything that failed earlier — a
+    rejected add-on token (``ConfigEntryAuthFailed``, which HA does not
+    retry) or an add-on that was simply down when HA started — left the
+    route absent, so Home Assistant answered every envelope with its own
+    plain ``404: Not Found``. A peer reads that as "this inbox does not
+    exist" rather than "try again later", and on the Social Home side it
+    burned the entire delivery retry ladder. The household fell off the
+    network with nothing in the HA log to connect the two.
+
+    The view resolves the live config entry per request and already
+    returns ``503 not_ready`` when none has finished setup — a branch
+    that was unreachable while registration came last. 503 is what a peer
+    should see here, because it retries on that.
+    """
+    async_register_inbox_view(hass)
+    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: SocialHomeConfigEntry) -> bool:
@@ -95,12 +125,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: SocialHomeConfigEntry) -
     # ``EVENT_CORE_CONFIG_UPDATE`` listener never fired for Nabu
     # Casa Cloud's runtime TURN registration, leaving Cloud
     # users with stale STUN-only ICE state.
-
-    # Public inbox URL for inbound federation envelopes. The view
-    # is stateless per request, looks up the live config entry on
-    # every call, and is idempotent across reloads — one
-    # registration per HA process.
-    async_register_inbox_view(hass)
 
     # Location forwarder — only attach when the user wants HA →
     # Social Home presence sync. Toggling the option triggers a

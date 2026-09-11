@@ -36,6 +36,43 @@ jobs:
       - run: pip install -r requirements_test.txt
       - run: mypy custom_components/socialhome
 
+  # The manifest pins ``socialhome-client`` exactly, deliberately — a
+  # hard pin is what keeps an upstream client release from breaking
+  # households on update. The cost is that an unresolvable pin stops the
+  # whole component from loading, which takes the federation inbox route
+  # down with it, and nothing else in CI exercises the pinned version:
+  # ``requirements_test.txt`` resolves a range, so the tests can pass
+  # against a version production never runs. This job installs exactly
+  # what the manifest asks for, so a bad pin fails here instead of on a
+  # user's box.
+  manifest-requirements:
+    name: manifest requirements install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+      - name: Install exactly the manifest's requirements
+        run: |
+          python - <<'PY'
+          import json, pathlib, subprocess, sys
+          manifest = json.loads(
+              pathlib.Path(
+                  "custom_components/socialhome/manifest.json"
+              ).read_text()
+          )
+          reqs = manifest.get("requirements") or []
+          if not reqs:
+              print("manifest declares no requirements")
+              sys.exit(0)
+          print("installing:", reqs)
+          subprocess.run([sys.executable, "-m", "pip", "install", *reqs], check=True)
+          PY
+      - name: Import the pinned client
+        run: python -c "import socialhome_client; print(socialhome_client.__name__)"
+
   test:
     name: pytest
     runs-on: ubuntu-latest

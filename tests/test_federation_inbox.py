@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock, MagicMock
 from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.typing import ClientSessionGenerator
-from socialhome_client import FederationRelayResult, SHClientError
+from socialhome_client import FederationRelayResult, SHAuthError, SHClientError
 
 
 async def _setup(
@@ -238,3 +238,57 @@ async def test_inbox_view_registered_once_across_reloads(
     # called twice.
     assert await hass.config_entries.async_reload(config_entry.entry_id)
     await hass.async_block_till_done()
+
+
+async def test_inbox_route_exists_after_auth_failure(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+    mock_client: MagicMock,
+    hass_client_no_auth: ClientSessionGenerator,
+) -> None:
+    """A rejected token must not take the inbox route down with it.
+
+    ``ConfigEntryAuthFailed`` is terminal — Home Assistant does not retry
+    it — so while the route was registered at the *end* of setup, a token
+    problem meant HA answered every federation envelope with its own
+    plain ``404: Not Found``. Peers read that as "this inbox does not
+    exist"; on the Social Home side it burned the whole retry ladder and
+    the household silently fell off the network.
+
+    Registering the view first makes the existing ``503 not_ready``
+    branch reachable, which is what a peer should see: retry, don't give
+    up.
+    """
+    mock_client.return_value.me.get = AsyncMock(side_effect=SHAuthError())
+    config_entry.add_to_hass(hass)
+    assert not await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    client = await hass_client_no_auth()
+    resp = await client.post("/api/socialhome/inbox/wh-abc", data=b"{}")
+
+    assert resp.status == 503, (
+        "expected the route to exist and report not-ready; a 404 means "
+        "Home Assistant has no such route at all"
+    )
+    assert (await resp.json())["error"] == "not_ready"
+
+
+async def test_inbox_route_exists_while_addon_unreachable(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+    mock_client: MagicMock,
+    hass_client_no_auth: ClientSessionGenerator,
+) -> None:
+    """Same for the retryable case — an add-on that is down at HA start
+    must not remove the route for the duration of the outage."""
+    mock_client.return_value.me.get = AsyncMock(side_effect=SHClientError("down"))
+    config_entry.add_to_hass(hass)
+    assert not await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    client = await hass_client_no_auth()
+    resp = await client.post("/api/socialhome/inbox/wh-abc", data=b"{}")
+
+    assert resp.status == 503
+    assert (await resp.json())["error"] == "not_ready"

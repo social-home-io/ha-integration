@@ -38,10 +38,14 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 
-#: HA keeps view registration idempotent via a flag in
-#: ``hass.data[DOMAIN]``. Reloading a single config entry must not
-#: re-register the same URL; tearing down the last entry clears
-#: the flag so a future setup re-attaches cleanly.
+#: Guards against double registration via a flag in
+#: ``hass.data[DOMAIN]``. Home Assistant has no way to *un*register an
+#: HTTP view, so registration must happen once per process and can never
+#: be undone — which is why it lives in ``async_setup`` rather than per
+#: config entry. The flag is belt-and-braces for that, and for the rare
+#: multi-account case. (An earlier revision of this comment claimed the
+#: flag is cleared on last-entry teardown; no such cleanup exists, and
+#: adding one would be wrong — the view stays registered regardless.)
 _INBOX_VIEW_REGISTERED: Final = "inbox_view_registered"
 
 
@@ -123,9 +127,17 @@ class SocialHomeFederationInboxView(HomeAssistantView):
 def async_register_inbox_view(hass: HomeAssistant) -> None:
     """Register :class:`SocialHomeFederationInboxView` exactly once.
 
-    Called from :func:`async_setup_entry`. The flag in
-    ``hass.data[DOMAIN]`` keeps a reload — or a second config entry
-    in the rare multi-account case — from colliding with the
+    Called from :func:`~custom_components.socialhome.async_setup`, i.e.
+    at component setup, so the route exists as soon as Home Assistant
+    loads the integration — independent of whether a config entry then
+    manages to set up. That ordering is the point: while this ran at the
+    end of ``async_setup_entry``, a rejected add-on token or an add-on
+    that was down at HA start left the route absent entirely, and HA
+    answered federation peers with its own plain ``404: Not Found``
+    instead of this view's ``503 not_ready``.
+
+    The flag in ``hass.data[DOMAIN]`` keeps a reload — or a second config
+    entry in the rare multi-account case — from colliding with the
     existing URL registration.
     """
     bucket = hass.data.setdefault(DOMAIN, {})
